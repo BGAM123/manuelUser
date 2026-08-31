@@ -48,7 +48,7 @@ export function Pagination({
           </SelectContent>
         </Select>
         <span className="ml-1 sm:ml-2">
-          {start}–{end} {t("common.of")} {total}
+          {start.toLocaleString("fr-FR")}–{end.toLocaleString("fr-FR")} {t("common.of")} {total.toLocaleString("fr-FR")}
         </span>
       </div>
       <div className="flex items-center justify-center gap-1">

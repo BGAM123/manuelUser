@@ -12,7 +12,7 @@ import { isTokenExpiringSoon } from "@/utils/jwt";
 import api from "@/api/axios";
 
 const HEARTBEAT_INTERVAL_MS = 60 * 1000; // Vérifie toutes les 60 secondes
-const REFRESH_THRESHOLD_S = 180; // Rafraîchit si expiration < 3 minutes
+const REFRESH_THRESHOLD_S = 300; // Rafraîchit si expiration < 5 minutes
 
 export function useHeartbeat() {
   useEffect(() => {

@@ -21,7 +21,17 @@ function subscribe(cb: () => void) {
 export function useConnectedUser() {
   const raw = useSyncExternalStore(subscribe, getSnapshot, () => null);
 
-  const user: AuthUser | null = raw ? (JSON.parse(raw) as AuthUser) : null;
+  // Une valeur corrompue (ex. écriture ratée après un déploiement — voir
+  // Authentification.tsx) ne doit jamais faire planter tout le rendu :
+  // on la traite comme "non connecté" plutôt que de laisser JSON.parse lever.
+  let user: AuthUser | null = null;
+  if (raw) {
+    try {
+      user = JSON.parse(raw) as AuthUser;
+    } catch {
+      localStorage.removeItem(USER_KEY);
+    }
+  }
 
   const fullName = user ? `${user.firstName} ${user.lastName}` : "";
 
@@ -30,11 +40,12 @@ export function useConnectedUser() {
     : "?";
 
   const serviceName = user?.service?.nom ?? "";
+  const roleName = user?.assignedRoles?.[0]?.nom ?? "";
 
   /** Permet de forcer une mise à jour après avoir modifié le localStorage manuellement */
   const refresh = useCallback(() => {
     window.dispatchEvent(new Event("storage"));
   }, []);
 
-  return { user, fullName, avatarInitials, serviceName, refresh };
+  return { user, fullName, avatarInitials, serviceName, roleName, refresh };
 }

@@ -8,12 +8,14 @@
 
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { logoutApi } from "@/api/authentication/auth.api";
 
 const DEFAULT_TIMEOUT_MS = 14 * 60 * 1000; // 14 minutes
 
 export function useAutoLogout(timeoutMs = DEFAULT_TIMEOUT_MS) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -21,6 +23,10 @@ export function useAutoLogout(timeoutMs = DEFAULT_TIMEOUT_MS) {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         logoutApi();
+        // Purge le cache React Query — voir AppShell.handleLogout : sans ça,
+        // les données du compte déconnecté restent en mémoire pour le
+        // prochain utilisateur qui se connecte dans le même onglet.
+        queryClient.clear();
         navigate("/authentification", { replace: true });
       }, timeoutMs);
     };
@@ -41,5 +47,5 @@ export function useAutoLogout(timeoutMs = DEFAULT_TIMEOUT_MS) {
       if (timerRef.current) clearTimeout(timerRef.current);
       events.forEach((e) => window.removeEventListener(e, reset));
     };
-  }, [navigate, timeoutMs]);
+  }, [navigate, queryClient, timeoutMs]);
 }

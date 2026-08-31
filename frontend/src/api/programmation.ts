@@ -1,10 +1,10 @@
 import { unites } from "./common";
-import { cats, designationsBy, type Bien } from "./biens";
+import { cats, designationsBy } from "./biens";
 
 export type Programmation = {
   id: string;
   designation: string;
-  categorie: Bien["categorie"];
+  categorie: (typeof cats)[number];
   exercice: string;
   maturation: "Idée" | "Étude" | "Prêt à engager" | "Engagé";
   datePrevue: string;

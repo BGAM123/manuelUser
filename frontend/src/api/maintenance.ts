@@ -1,5 +1,10 @@
 import { unites } from "./common";
-import { mockBiens } from "./biens";
+
+const biensNoms = [
+  "Ordinateur portable Dell", "Toyota Hilux", "Imprimante HP LaserJet",
+  "Serveur Rack", "Bureau ministre", "Armoire métallique", "Onduleur 3kVA",
+  "Peugeot 508", "Table de réunion", "Moto Yamaha DT",
+];
 
 export type Maintenance = {
   id: string;
@@ -14,7 +19,7 @@ export type Maintenance = {
 
 export const mockMaintenances: Maintenance[] = Array.from({ length: 28 }, (_, i) => ({
   id: `M-${String(i + 1).padStart(3, "0")}`,
-  bien: mockBiens[i * 3]?.designation ?? "Bien",
+  bien: biensNoms[i % biensNoms.length],
   poste: `Poste ${((i % 6) + 1)}`,
   dateBesoin: `2026-${String((i % 12) + 1).padStart(2, "0")}-${String((i % 27) + 1).padStart(2, "0")}`,
   evaluation: (i + 1) * 85_000,

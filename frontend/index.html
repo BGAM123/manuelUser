@@ -5,16 +5,40 @@
     <link rel="icon" type="image/png" href="/minepia-logo.png" />
     <link rel="apple-touch-icon" href="/minepia-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MINEPIA — Gestion du patrimoine</title>
+    <title>MINEPIA - Gestion du patrimoine</title>
     <meta name="description" content="Application de gestion du patrimoine du Ministère de l'Élevage, des Pêches et des Industries Animales du Cameroun." />
     <meta name="author" content="MINEPIA" />
-    <meta property="og:title" content="MINEPIA — Gestion du patrimoine" />
+    <meta property="og:title" content="MINEPIA - Gestion du patrimoine" />
     <meta property="og:description" content="Inventaires, acquisitions, mouvements, amortissements, maintenance et reporting du patrimoine MINEPIA." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <style>
+      /* ── Print styles — fiche bien ─────────────────────────────────────── */
+      #minepia-print-area { display: none; }
+      @media print {
+        /* Cache toute l'app */
+        #root { display: none !important; }
+        /* Affiche uniquement la zone d'impression — position static pour que
+           le contenu long s'étale sur plusieurs pages sans être tronqué */
+        #minepia-print-area {
+          display: block !important;
+          position: static !important;
+          top: auto; left: auto;
+          width: 100%;
+          z-index: 9999;
+          background: #fff;
+        }
+        /* Évite les coupures au milieu des tableaux et sections */
+        #minepia-print-area table { page-break-inside: auto; }
+        #minepia-print-area tr    { page-break-inside: avoid; page-break-after: auto; }
+        #minepia-print-area div[style*="page-break-inside:avoid"] { page-break-inside: avoid; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Zone d'impression — hors de #root pour ne pas être cachée par @media print -->
+    <div id="minepia-print-area" style="display:none"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

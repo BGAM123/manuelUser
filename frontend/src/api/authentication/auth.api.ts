@@ -17,7 +17,18 @@ export interface LoginPayload {
 
 export interface AuthTokenData {
   token: string;
-  refresh_token: string;
+  refresh_token: string | null;
+}
+
+// Résultat de login_check : soit un token direct, soit une demande OTP
+export type LoginResult =
+  | { requiresOtp: false; token: string; refresh_token: string | null }
+  | { requiresOtp: true; email: string };
+
+export interface AuthUserRole {
+  id: number;
+  nom: string;
+  permissions?: { id: number; nom: string }[];
 }
 
 export interface AuthUser {
@@ -35,28 +46,56 @@ export interface AuthUser {
     ordre: number;
     is_active: boolean;
   };
+  assignedRoles?: AuthUserRole[];
 }
 
 // ─── Fonctions ─────────────────────────────────────────────────────────────
 
 /**
  * Connexion — POST /login_check
- * Stocke le token, le refresh token et le profil dans le localStorage.
+ * Retourne soit les tokens (2FA désactivé), soit { requiresOtp: true } (2FA actif).
  */
-export async function loginApi(payload: LoginPayload): Promise<AuthTokenData> {
+export async function loginApi(payload: LoginPayload): Promise<LoginResult> {
   const baseURL = import.meta.env.VITE_API_URL as string;
 
-  const response = await axios.post<ApiResponse<AuthTokenData>>(
+  const response = await axios.post<ApiResponse<{ token?: string; refresh_token?: string | null; requires_otp?: boolean }>>(
     `${baseURL}/login_check`,
+    payload,
+    { headers: { "Content-Type": "application/json" } },
+  );
+
+  const data = response.data.data;
+
+  if (data.requires_otp) {
+    return { requiresOtp: true, email: payload.email };
+  }
+
+  const token = data.token!;
+  const refresh_token = data.refresh_token ?? null;
+  localStorage.setItem(TOKEN_KEY, token);
+  if (refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
+
+  return { requiresOtp: false, token, refresh_token };
+}
+
+/**
+ * Vérification OTP — POST /auth/verify-otp
+ * Valide le code reçu par mail et retourne le token JWT.
+ */
+export async function verifyOtpApi(payload: { email: string; otp: string }): Promise<AuthTokenData> {
+  const baseURL = import.meta.env.VITE_API_URL as string;
+
+  const response = await axios.post<ApiResponse<{ token: string; refresh_token: string | null }>>(
+    `${baseURL}/auth/verify-otp`,
     payload,
     { headers: { "Content-Type": "application/json" } },
   );
 
   const { token, refresh_token } = response.data.data;
   localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
+  if (refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
 
-  return { token, refresh_token };
+  return { token, refresh_token: refresh_token ?? "" };
 }
 
 /**

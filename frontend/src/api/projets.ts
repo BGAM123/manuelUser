@@ -1,5 +1,3 @@
-import { mockBiens } from "./biens";
-
 export type ProjetStatut = "Planifié" | "En cours" | "Suspendu" | "Clôturé";
 
 export type Projet = {
@@ -68,48 +66,11 @@ export const mockProjets: Projet[] = projetsSeed.map((p, i) => ({
   id: `PRJ-${String(i + 1).padStart(4, "0")}`,
 }));
 
-export const mockProjetBiens: ProjetBien[] = mockProjets.flatMap((p, pi) => {
-  const count = 4 + (pi % 3);
-  return Array.from({ length: count }, (_, j) => {
-    const bien = mockBiens[(pi * 7 + j * 3) % mockBiens.length];
-    return {
-      id: `PB-${p.id}-${j + 1}`,
-      projetId: p.id,
-      bienId: bien.id,
-      dateAffectation: p.dateDebut,
-      utilisateur: p.responsable,
-      commentaire: "Affectation initiale du projet",
-      actif: true,
-    };
-  });
-});
+// mockProjetBiens vide — les données réelles viennent de l'API
+export const mockProjetBiens: ProjetBien[] = [];
 
-const mouvementTypes: MouvementProjetType[] = [
-  "Entrée",
-  "Entrée",
-  "Sortie",
-  "Transfert",
-  "Retour stock",
-  "Réforme",
-  "Perte",
-];
-
-export const mockMouvementsProjet: MouvementProjet[] = mockProjets.flatMap((p, pi) => {
-  const count = 3 + (pi % 3);
-  return Array.from({ length: count }, (_, j) => {
-    const bien = mockBiens[(pi * 5 + j * 4) % mockBiens.length];
-    const type = mouvementTypes[(pi + j) % mouvementTypes.length];
-    return {
-      id: `MP-${p.id}-${j + 1}`,
-      projetId: p.id,
-      bienId: bien.id,
-      type,
-      date: `${p.dateDebut.slice(0, 4)}-${String(((pi + j) % 12) + 1).padStart(2, "0")}-${String(((j * 5) % 27) + 1).padStart(2, "0")}`,
-      utilisateur: p.responsable,
-      observation: `Mouvement ${type.toLowerCase()} enregistré pour ${bien.designation}`,
-    };
-  });
-});
+// mockMouvementsProjet vide — les données réelles viennent de l'API
+export const mockMouvementsProjet: MouvementProjet[] = [];
 
 export const mockHistoriqueProjet: HistoriqueProjet[] = mockProjets.flatMap((p) => [
   { id: `HP-${p.id}-1`, projetId: p.id, date: `${p.dateDebut}T09:00:00`, utilisateur: p.responsable, action: "Création du projet", ancienneValeur: "—", nouvelleValeur: p.intitule },

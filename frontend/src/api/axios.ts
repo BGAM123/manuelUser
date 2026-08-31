@@ -18,6 +18,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { isTokenExpiringSoon, isTokenExpired } from "@/utils/jwt";
+import { queryClient } from "@/api/queryClient";
 
 // ─── Clés localStorage ─────────────────────────────────────────────────────
 export const TOKEN_KEY = "minepia_token";
@@ -110,9 +111,26 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+// Méthodes qui modifient des données côté serveur — après chaque
+// enregistrement réussi (création/modification/suppression), on invalide
+// toutes les requêtes actives pour que les pages affichées se rafraîchissent
+// automatiquement, sans dépendre d'un invalidateQueries() ciblé oublié dans
+// tel ou tel appelant (demande explicite 2026-08-29 : "actualiser les
+// données et les pages après chaque enregistrement dans le système").
+// N'invalide réellement (refetch) que les requêtes actuellement à l'écran —
+// les autres sont juste marquées périmées, refetchées à leur prochain
+// montage grâce à refetchOnMount: "always" (voir queryClient.ts).
+const MUTATING_METHODS = new Set(["post", "put", "patch", "delete"]);
+
 // ─── Intercepteur de réponse ───────────────────────────────────────────────
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = response.config.method?.toLowerCase();
+    if (method && MUTATING_METHODS.has(method)) {
+      queryClient.invalidateQueries();
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 

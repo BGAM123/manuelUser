@@ -1,0 +1,16 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "nom": "Localisation du bien",
+        "description": "Point de localisation importé"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.985595703125002, 8.700499129275828]
+      }
+    }
+  ]
+}

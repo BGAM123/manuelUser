@@ -146,11 +146,11 @@ function ProjetsShell() {
     },
     {
       key: "valeur",
-      label: "Valeur patrimoine",
+      label: "Valeur patrimoine (FCFA)",
       className: "text-right",
       render: (r) => <span className="tabular-nums">{formatFCFA(valeurProjet(r.id))}</span>,
       sortValue: (r) => valeurProjet(r.id),
-      exportFormat: (r) => valeurProjet(r.id),
+      exportFormat: (r) => formatFCFA(valeurProjet(r.id)),
     },
     {
       key: "statut",
@@ -641,13 +641,13 @@ function BiensAffectesTable({ projetBiens }: { projetBiens: ProjetBien[] }) {
     },
     {
       key: "valeur",
-      label: "Valeur",
+      label: "Valeur (FCFA)",
       className: "text-right",
       render: (r) => (
         <span className="tabular-nums">{formatFCFA(r.bien?.valeurAcquisition ?? 0)}</span>
       ),
       sortValue: (r) => r.bien?.valeurAcquisition ?? 0,
-      exportFormat: (r) => r.bien?.valeurAcquisition ?? 0,
+      exportFormat: (r) => formatFCFA(r.bien?.valeurAcquisition ?? 0),
     },
     { key: "dateAffectation", label: "Affecté le" },
     { key: "utilisateur", label: "Par" },
