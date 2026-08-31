@@ -36,6 +36,7 @@ final class ListAssetAssignmentsController extends AbstractController
     #[OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string'), description: 'Filtrer par statut du bien (ex: ACTIF, EN MAINTENANCE, SORTIS).')]
     #[OA\Parameter(name: 'received', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens recus (true) ou non recu (false).')]
     #[OA\Parameter(name: 'securise', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens sécurisés (true) ou non sécurisés (false).')]
+    #[OA\Parameter(name: 'restitue', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les affectations restituées (true) ou non restituées (false).')]
     #[OA\Response(
         response: 200,
         description: 'Success',
@@ -126,6 +127,7 @@ final class ListAssetAssignmentsController extends AbstractController
         $statut = $request->query->get('statut');
         $securise = $request->query->get('securise');
         $received = $request->query->get('received');
+        $restitue = $request->query->get('restitue');
 
         // Résolution de catégorie
         $categoryResolution = null;
@@ -156,8 +158,8 @@ final class ListAssetAssignmentsController extends AbstractController
             }
         }
 
-        $items = $assignmentRepository->findPaginated($page, $limit, $isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received);
-        $total = $assignmentRepository->countAll($isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received);
+        $items = $assignmentRepository->findPaginated($page, $limit, $isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue);
+        $total = $assignmentRepository->countAll($isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue);
 
         $data = array_map(static fn ($assignment) => $responseBuilder->buildListItem($assignment, $user), $items);
 

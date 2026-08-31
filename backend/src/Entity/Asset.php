@@ -317,7 +317,15 @@ class Asset
      */
     #[ORM\OneToMany(mappedBy: 'asset', targetEntity: AssetReformRequest::class)]
     #[Groups(['asset:detail'])]
-    private Collection $reformRequests;
+    private Collection $assetReformRequests;
+
+    /**
+     * ✅ Utilisateur de restitution du bien (optionnel)
+     */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(name: 'user_restitution_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['asset:detail'])]
+    private ?User $userRestitution = null;
 
     /**
      * @var Collection<int, AssetSecurity>
@@ -987,6 +995,21 @@ class Asset
     public function getPiecesJointes(): Collection
     {
         return $this->piecesJointes;
+    }
+
+    /**
+     * ✅ Utilisateur de restitution du bien
+     */
+    public function getUserRestitution(): ?User
+    {
+        return $this->userRestitution;
+    }
+
+    public function setUserRestitution(?User $userRestitution): static
+    {
+        $this->userRestitution = $userRestitution;
+
+        return $this;
     }
 
     public function addPieceJointe(PieceJointe $pieceJointe): static

@@ -345,6 +345,83 @@ final class AssetAssignmentService
     }
 
     /**
+     * ✅ Restitue un bien avec logique automatique
+     * @param Asset $asset
+     * @param array<string, mixed> $payload
+     * @param User|null $currentUser
+     * @return AssetAssignment
+     */
+    public function restituerAsset(Asset $asset, array $payload, ?User $currentUser): AssetAssignment
+    {
+        // ✅ Logique automatique : dateDebut = date du jour si non fournie
+        $dateDebut = new \DateTime();
+        if (isset($payload['dateDebut']) && !empty($payload['dateDebut'])) {
+            $dateDebut = new \DateTime($payload['dateDebut']);
+        }
+
+        // ✅ Logique automatique : si user_id non fourni, utiliser userRestitution du bien
+        $userId = $payload['user_id'] ?? null;
+        if (null === $userId) {
+            $userRestitution = $asset->getUserRestitution();
+            if ($userRestitution) {
+                $userId = $userRestitution->getId();
+            }
+        }
+
+        // ✅ Logique automatique : si affectation en cours, renseigner dateFin (date fournie ou date du jour)
+        $lastAssignment = $asset->getAssignments()->last();
+        if ($lastAssignment && $lastAssignment->isDetenteur() && null === $lastAssignment->getDateFin()) {
+            $dateFin = isset($payload['dateFin']) && !empty($payload['dateFin']) 
+                ? new \DateTime($payload['dateFin']) 
+                : new \DateTime();
+            $lastAssignment->setDateFin($dateFin);
+            $lastAssignment->setDetenteur(false);
+            $this->assignmentRepository->save($lastAssignment);
+        }
+
+        // Créer la nouvelle affectation de restitution
+        $assignment = new AssetAssignment();
+        $assignment->setAsset($asset);
+        $assignment->setTypeAffectation('RESTITUTION');
+        $assignment->setDateDebut($dateDebut);
+        $assignment->setDetenteur(true);
+        $assignment->setCommentaire($payload['commentaire'] ?? 'Restitution du bien.');
+
+        if ($userId) {
+            $user = $this->userRepository->find($userId);
+            if (!$user) {
+                throw new ResourceNotFoundException('Utilisateur introuvable.');
+            }
+            $assignment->setUser($user);
+        }
+
+        // Définir l'utilisateur créateur si fourni
+        if ($currentUser !== null) {
+            $assignment->setCreatedBy($currentUser);
+            $assignment->setAssignedBy($currentUser);
+        }
+
+        $this->validate($assignment);
+        $this->assignmentRepository->save($assignment);
+
+        // ✅ Personnaliser le message de notification pour les restitutions
+        $recipient = $this->resolveRecipient($assignment);
+        if ($recipient) {
+            $this->notificationService->notify(
+                $recipient,
+                Notification::SUBJECT_ASSET_ASSIGNMENT,
+                $assignment->getId(),
+                Notification::TYPE_CREATED,
+                'Restitution de bien',
+                sprintf('Le bien "%s" vous a été restitué.', $assignment->getAsset()?->getNom() ?? ('#' . $assignment->getAsset()?->getId())),
+                $currentUser
+            );
+        }
+
+        return $assignment;
+    }
+
+    /**
      * ✅ Gère le statut de détenteur : passe l'ancien détenteur à false et le nouveau à true
      */
     private function manageDetenteurStatus(AssetAssignment $newAssignment): void

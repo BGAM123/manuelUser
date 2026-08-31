@@ -5,7 +5,6 @@ namespace App\Controller\Consumables;
 use App\Entity\Consumable;
 use App\Repository\ConsumableRepository;
 use App\Service\ApiResponseFactory;
-use App\Service\ConsumableTransferStockManager; // 🔥 NOUVEAU
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -37,6 +36,7 @@ final class ConsumableDetailController extends AbstractController
                     'description' => 'Papier format A4 80g/m²',
                     'quantite' => '5000.00',
                     'stockActuel' => '4500.00',
+                    'quantityConsumed' => '500.00',
                     'prixInitial' => '10.00',
                     'prixTotal' => '50000.00',
                     'category' => ['id' => 2, 'nom' => 'Fournitures de bureau'],
@@ -56,7 +56,6 @@ final class ConsumableDetailController extends AbstractController
     public function __invoke(
         int $id,
         ConsumableRepository $consumableRepository,
-        ConsumableTransferStockManager $stockManager, // 🔥 NOUVEAU
         ApiResponseFactory $apiResponse
     ): JsonResponse {
         $consumable = $consumableRepository->getActiveById($id);
@@ -64,23 +63,24 @@ final class ConsumableDetailController extends AbstractController
             return $apiResponse->error('Le consomptible demandé est introuvable.', Response::HTTP_NOT_FOUND);
         }
 
-        // 🔥 UTILISER LE NOUVEAU STOCK MANAGER
-        $serviceId = $consumable->getService()?->getId();
-        $stockActuel = $serviceId 
-            ? $stockManager->getCurrentStock($id, $serviceId)
-            : 0;
+        // Stock global du consomptible (quantité initiale/entrées - transferts + retours -
+        // consommé), pas la vue par service : c'est la même formule que celle persistée dans
+        // Consumable::stockActuel par ConsumableStockManager, recalculée ici à la volée pour
+        // être toujours à jour même si un mouvement récent n'a pas encore déclenché le cache.
+        $stockActuel = $consumableRepository->getStockActuel($id);
+        $quantityConsumed = $consumableRepository->getTotalQuantityConsumed($id);
 
-        // 🔥 METTRE À JOUR LE STOCK DANS L'ENTITÉ (optionnel, pour le cache)
+        // Met à jour le cache (optionnel, pour les autres écrans qui lisent stockActuel direct)
         $consumable->setStockActuel((string) $stockActuel);
 
         return $apiResponse->success(
-            $this->normalizeDetail($consumable, $stockActuel),
+            $this->normalizeDetail($consumable, $stockActuel, $quantityConsumed),
             Response::HTTP_OK,
             'Détail du consomptible récupéré avec succès.'
         );
     }
 
-    private function normalizeDetail(Consumable $consumable, float $stockActuel): array
+    private function normalizeDetail(Consumable $consumable, float $stockActuel, float $quantityConsumed): array
     {
         return [
             'id' => $consumable->getId(),
@@ -88,6 +88,7 @@ final class ConsumableDetailController extends AbstractController
             'description' => $consumable->getDescription(),
             'quantite' => $consumable->getQuantite(),
             'stockActuel' => (string) $stockActuel,
+            'quantityConsumed' => (string) $quantityConsumed,
             'prixInitial' => $consumable->getPrixInitial(),
             'prixTotal' => $consumable->getPrixTotal(),
             'category' => $consumable->getCategory() ? ['id' => $consumable->getCategory()->getId(), 'nom' => $consumable->getCategory()->getNom()] : null,

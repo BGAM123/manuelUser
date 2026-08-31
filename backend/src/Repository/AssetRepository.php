@@ -210,6 +210,7 @@ class AssetRepository extends ServiceEntityRepository
         ?int $userId = null,
         ?string $securise = null,
         ?string $received = null,
+        ?string $restitue = null,
     ): array {
         $qb = $this->createQueryBuilder('a')
             ->leftJoin('a.categories', 'c')->addSelect('c')
@@ -254,10 +255,16 @@ class AssetRepository extends ServiceEntityRepository
             $qb->andWhere('a.exercice = :exercice')->setParameter('exercice', $exercice);
         }
         if (null !== $statut) {
-            $qb->andWhere('a.statut = :statut')->setParameter('statut', $statut);
+            if (in_array($statut, ['SORTIE', 'SORTIS'], true)) {
+                // Des biens sortis existent en base avec les deux graphies ('SORTIE' et
+                // 'SORTIS', selon la date de création — cf. AssetExitService) : on matche les deux.
+                $qb->andWhere('a.statut IN (:statutsSortis)')->setParameter('statutsSortis', ['SORTIE', 'SORTIS']);
+            } else {
+                $qb->andWhere('a.statut = :statut')->setParameter('statut', $statut);
+            }
         } else {
-            // Par défaut, exclure les biens SORTIS
-            $qb->andWhere('a.statut != :statutDefault')->setParameter('statutDefault', 'SORTIE');
+            // Par défaut, exclure les biens sortis (les deux graphies existantes en base).
+            $qb->andWhere('a.statut NOT IN (:statutsExclus)')->setParameter('statutsExclus', ['SORTIE', 'SORTIS']);
         }
 
         // Filtre par utilisateur connecté (détenteur actuel OU créateur)
@@ -292,6 +299,20 @@ class AssetRepository extends ServiceEntityRepository
             }
         }
 
+        // ✅ Filtre par restitution (via le typeAffectation des affectations)
+        if (null !== $restitue && '' !== trim($restitue)) {
+            $isRestitue = filter_var($restitue, FILTER_VALIDATE_BOOLEAN);
+            if ($isRestitue) {
+                // Biens restitués : ont une affectation de type RESTITUTION active (detenteur = true, dateFin IS NULL)
+                $qb->andWhere('ass.typeAffectation = :typeRestitution AND ass.detenteur = true AND ass.dateFin IS NULL')
+                    ->setParameter('typeRestitution', 'RESTITUTION');
+            } else {
+                // Biens non restitués : n'ont pas d'affectation de type RESTITUTION active
+                $qb->andWhere('(ass.typeAffectation != :typeRestitution OR ass.typeAffectation IS NULL OR ass.detenteur = false OR ass.dateFin IS NOT NULL)')
+                    ->setParameter('typeRestitution', 'RESTITUTION');
+            }
+        }
+
         if (null !== $statut) {
             $qb->andWhere('a.statut = :statut')->setParameter('statut', $statut);
         } else {
@@ -314,6 +335,7 @@ public function countAll(
     ?int $userId = null,
     ?string $securise = null,
     ?string $received = null,
+    ?string $restitue = null,
 ): int {
     $qb = $this->createQueryBuilder('a')
         ->select('COUNT(DISTINCT a.id)')
@@ -363,12 +385,17 @@ public function countAll(
     }
 
     if (null !== $statut) {
-        $qb->andWhere('a.statut = :statut')
-           ->setParameter('statut', $statut);
+        if (in_array($statut, ['SORTIE', 'SORTIS'], true)) {
+            $qb->andWhere('a.statut IN (:statutsSortis)')
+               ->setParameter('statutsSortis', ['SORTIE', 'SORTIS']);
+        } else {
+            $qb->andWhere('a.statut = :statut')
+               ->setParameter('statut', $statut);
+        }
     } else {
-        // Par défaut, exclure les biens SORTIS
-        $qb->andWhere('a.statut != :statutDefault')
-           ->setParameter('statutDefault', 'SORTIE');
+        // Par défaut, exclure les biens sortis (les deux graphies existantes en base).
+        $qb->andWhere('a.statut NOT IN (:statutsExclus)')
+           ->setParameter('statutsExclus', ['SORTIE', 'SORTIS']);
     }
 
     // Filtre par utilisateur connecté (détenteur actuel OU créateur)
@@ -402,6 +429,20 @@ public function countAll(
         } else {
             // Biens dont l'affectation actuelle n'a pas été accusée réception
             $qb->andWhere('(ass.received = false OR ass.received IS NULL) AND ass.detenteur = true');
+        }
+    }
+
+    // ✅ Filtre par restitution (via le typeAffectation des affectations)
+    if (null !== $restitue && '' !== trim($restitue)) {
+        $isRestitue = filter_var($restitue, FILTER_VALIDATE_BOOLEAN);
+        if ($isRestitue) {
+            // Biens restitués : ont une affectation de type RESTITUTION active (detenteur = true, dateFin IS NULL)
+            $qb->andWhere('ass.typeAffectation = :typeRestitution AND ass.detenteur = true AND ass.dateFin IS NULL')
+                ->setParameter('typeRestitution', 'RESTITUTION');
+        } else {
+            // Biens non restitués : n'ont pas d'affectation de type RESTITUTION active
+            $qb->andWhere('(ass.typeAffectation != :typeRestitution OR ass.typeAffectation IS NULL OR ass.detenteur = false OR ass.dateFin IS NOT NULL)')
+                ->setParameter('typeRestitution', 'RESTITUTION');
         }
     }
 
@@ -582,7 +623,7 @@ public function countAll(
             ->andWhere('a.statut NOT IN (:statutsExclus)')
             ->andWhere('ass.dateFin IS NULL')
             ->setParameter('userId', $userId)
-            ->setParameter('statutsExclus', ['SORTIE', 'SORTIE'])
+            ->setParameter('statutsExclus', ['SORTIE', 'SORTIS'])
             ->orderBy('a.id', 'DESC')
             ->setFirstResult(($page - 1) * $limit)
             ->setMaxResults($limit);
@@ -672,7 +713,7 @@ public function countAll(
             ->leftJoin('a.createdBy', 'creator')
             ->andWhere('a.isDelete = false')
             ->andWhere('a.statut NOT IN (:statutsExclus)')
-            ->setParameter('statutsExclus', ['SORTIE', 'SORTIE'])
+            ->setParameter('statutsExclus', ['SORTIE', 'SORTIS'])
             ->orderBy('a.dateAcquisition', 'ASC')
             ->addOrderBy('a.id', 'ASC')
             ->setFirstResult(($page - 1) * $limit)
@@ -749,7 +790,7 @@ public function countAll(
             ->leftJoin('a.createdBy', 'creator')
             ->andWhere('a.isDelete = false')
             ->andWhere('a.statut NOT IN (:statutsExclus)')
-            ->setParameter('statutsExclus', ['SORTIE', 'SORTIE']);
+            ->setParameter('statutsExclus', ['SORTIE', 'SORTIS']);
 
         if (null !== $categoryId) {
             $qb->innerJoin('a.categories', 'c')

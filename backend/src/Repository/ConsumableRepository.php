@@ -90,6 +90,16 @@ class ConsumableRepository extends ServiceEntityRepository
             ->setParameter('id', $consumableId);
         $totalTransferts = (float) $qbTransferts->getQuery()->getSingleScalarResult();
 
+        // Somme des quantités consommées sur les transferts reçus par les services.
+        $qbConsommes = $this->getEntityManager()->createQueryBuilder()
+            ->select('COALESCE(SUM(ct.quantityConsumed), 0)')
+            ->from('App\Entity\ConsumableTransfer', 'ct')
+            ->where('ct.consumable = :id')
+            ->andWhere('ct.isDelete = false')
+            ->andWhere('ct.quantityConsumed IS NOT NULL')
+            ->setParameter('id', $consumableId);
+        $totalConsommes = (float) $qbConsommes->getQuery()->getSingleScalarResult();
+
         // Somme des retours BSP (quantiteServie des BSP avec retour = true)
         $qbRetours = $this->getEntityManager()->createQueryBuilder()
             ->select('COALESCE(SUM(b.quantiteServie), 0)')
@@ -106,7 +116,24 @@ class ConsumableRepository extends ServiceEntityRepository
 
         $stockOuverture = $totalEntrees > 0 ? $totalEntrees : $quantiteInitiale;
 
-        return $stockOuverture - $totalTransferts + $totalRetours;
+        return max(0, $stockOuverture - $totalTransferts + $totalRetours - $totalConsommes);
+    }
+
+    /**
+     * Quantité totale consommée d'un consomptible, tous services confondus
+     * (somme de ConsumableTransfer::quantityConsumed sur les transferts actifs).
+     */
+    public function getTotalQuantityConsumed(int $consumableId): float
+    {
+        $qb = $this->getEntityManager()->createQueryBuilder()
+            ->select('COALESCE(SUM(ct.quantityConsumed), 0)')
+            ->from('App\Entity\ConsumableTransfer', 'ct')
+            ->where('ct.consumable = :id')
+            ->andWhere('ct.isDelete = false')
+            ->andWhere('ct.quantityConsumed IS NOT NULL')
+            ->setParameter('id', $consumableId);
+
+        return (float) $qb->getQuery()->getSingleScalarResult();
     }
 
     /**
@@ -209,7 +236,7 @@ class ConsumableRepository extends ServiceEntityRepository
     /**
      * Liste paginée des consomptibles
      */
-    public function findPaginated(int $page, int $limit, ?string $search = null, ?int $serviceId = null, ?string $isDelete = 'false'): array
+    public function findPaginated(int $page, int $limit, ?string $search = null, ?int $serviceId = null, ?string $isDelete = 'false', ?array $categoryIds = null): array
     {
         $qb = $this->createQueryBuilder('c')
             ->leftJoin('c.category', 'cat')->addSelect('cat')
@@ -230,6 +257,11 @@ class ConsumableRepository extends ServiceEntityRepository
             $qb->andWhere('c.service = :serviceId')
                 ->setParameter('serviceId', $serviceId);
         }
+        // 🔥 FILTRE PAR CATÉGORIES
+        if ($categoryIds && !empty($categoryIds)) {
+            $qb->andWhere('cat.id IN (:categoryIds)')
+                ->setParameter('categoryIds', $categoryIds);
+        }
 
         return $qb->getQuery()->getResult();
     }
@@ -237,10 +269,11 @@ class ConsumableRepository extends ServiceEntityRepository
     /**
      * Compte le nombre total de consomptibles
      */
-    public function countAll(?string $search = null, ?int $serviceId = null, ?string $isDelete = 'false'): int
+    public function countAll(?string $search = null, ?int $serviceId = null, ?string $isDelete = 'false', ?array $categoryIds = null): int
     {
         $qb = $this->createQueryBuilder('c')
-            ->select('COUNT(DISTINCT c.id)');
+            ->select('COUNT(DISTINCT c.id)')
+            ->leftJoin('c.category', 'cat');
         SoftDeleteQueryFilter::apply($qb, 'c', $isDelete);
 
         if ($search && '' !== $search) {
@@ -251,6 +284,12 @@ class ConsumableRepository extends ServiceEntityRepository
         if ($serviceId) {
             $qb->andWhere('c.service = :serviceId')
                 ->setParameter('serviceId', $serviceId);
+        }
+
+        // 🔥 FILTRE PAR CATÉGORIES
+        if ($categoryIds && !empty($categoryIds)) {
+            $qb->andWhere('cat.id IN (:categoryIds)')
+                ->setParameter('categoryIds', $categoryIds);
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult();

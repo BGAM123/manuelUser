@@ -55,11 +55,12 @@ final class UpdateAssetController extends AbstractController
                         new OA\Property(property: 'piecesJointesNoms[]', type: 'array', items: new OA\Items(type: 'string'), description: "Noms alignés : piecesJointesNoms[0]=Facture d'achat. Si omis → nom original. CSV Swagger auto-découpé.", example: ["Facture d'achat", 'Bon de livraison']),
                         new OA\Property(property: 'reference', type: 'string', nullable: true, description: 'Si vide/null/"null"/"undefined" → inchangé (update) ou auto (create)'),
                         new OA\Property(property: 'seuil', type: 'number', nullable: true, example: 500000, description: 'Seuil de coût pour les maintenances de ce bien'),
+                        new OA\Property(property: 'user_restitution_id', type: 'integer', nullable: true, example: 8, description: 'Optionnel. ID de l\'utilisateur de restitution par défaut pour ce bien.'),
                     ]
                 )
             ),
             new OA\JsonContent(
-                example: ['nom' => 'Ordinateur HP ProBook', 'etat_bien_id' => 2, 'valeur' => 900000, 'latitude' => 3.8480, 'longitude' => 11.5021, 'description' => '']
+                example: ['nom' => 'Ordinateur HP ProBook', 'etat_bien_id' => 2, 'valeur' => 900000, 'latitude' => 3.8480, 'longitude' => 11.5021, 'description' => '', 'user_restitution_id' => 8]
             ),
         ]
     )]

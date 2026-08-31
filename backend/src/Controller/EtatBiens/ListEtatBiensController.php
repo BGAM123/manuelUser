@@ -50,14 +50,8 @@ final class ListEtatBiensController extends AbstractController
                             'description' => 'Bien en panne de fonctionnement',
                             'is_delete' => false,
                             'assetTypes' => [
-                                [
-                                    'id' => 1,
-                                    'nom' => 'Véhicule',
-                                    'category' => [
-                                        'id' => 2,
-                                        'nom' => 'Matériel Roulant'
-                                    ]
-                                ]
+                                ['id' => 1, 'nom' => 'Véhicule'],
+                                ['id' => 3, 'nom' => 'Groupe électrogène'],
                             ],
                         ],
                     ],

@@ -210,7 +210,7 @@ class StatisticsRepository extends ServiceEntityRepository
                 $qb->setParameter("kw{$i}", $pattern);
             }
             $qb->andWhere(implode(' OR ', $orX));
-            
+
             $this->applyFilters($qb, $filters);
             $count = (int) $qb->getQuery()->getSingleScalarResult();
             $out[$label] = $count;
@@ -621,7 +621,7 @@ class StatisticsRepository extends ServiceEntityRepository
         $this->applyFilters($qb, $filters);
 
         $sites1 = $qb->getQuery()->getResult();
-        
+
         $qb2 = $this->createQueryBuilder('a')
             ->select('DISTINCT a.id as id', 'a.nom as nom', 'a.reference as reference')
             ->innerJoin('a.services', 's')
@@ -633,9 +633,9 @@ class StatisticsRepository extends ServiceEntityRepository
             ->setParameter('isActive', true);
         $this->applyLandScope($qb2);
         $this->applyFilters($qb2, $filters);
-        
+
         $sites2 = $qb2->getQuery()->getResult();
-        
+
         // Fusion des deux listes
         $sites = $sites1;
         $existingIds = array_column($sites1, 'id');
@@ -1694,7 +1694,7 @@ class StatisticsRepository extends ServiceEntityRepository
         $nonBati = $this->countTerrainsMatchingInput($filters, '%bâti%', ['%non%', 'false', '0', '%non bât%', '%non-bât%']);
         // Bâti peut être stocké comme 'OUI', 'True', ou valeur contenant 'bâti' mais qui ne matche pas 'non bâti'
         $totalBatiOccurrences = $this->countTerrainsMatchingInput($filters, '%bâti%', ['%oui%', 'true', '1', '%bâti%']);
-        
+
         $bati = max(0, $totalBatiOccurrences - $nonBati);
         $aucuneInfo = max(0, $total - $bati - $nonBati);
         $pct = fn(int $n) => $total > 0 ? round(($n / $total) * 100, 2) : 0.0;
@@ -3058,8 +3058,10 @@ class StatisticsRepository extends ServiceEntityRepository
         }
 
         if (!empty($filters['secured_service_id'])) {
-            $qb->andWhere("{$alias}.id = :securedServiceIdS")
-                ->setParameter('securedServiceIdS', $filters['secured_service_id']);
+            // Barrière de sécurité (pas juste un filtre) : le service de l'utilisateur connecté
+            // + tous ses descendants d'organigramme, jamais contournable depuis le frontend.
+            $qb->andWhere("{$alias}.id IN (:securedServiceIdS)")
+                ->setParameter('securedServiceIdS', $this->resolveServicesIdWithDescendants([(int) $filters['secured_service_id']]));
         }
 
         if (!empty($filters['secured_region_id'])) {
@@ -3087,7 +3089,7 @@ class StatisticsRepository extends ServiceEntityRepository
             29 => 'terrains',
             35 => 'batiments',
             // La catégorie 31 (Informatique) n'a pas de module dashboard dédié = affichage Patrimoine général
-            31 => null, 
+            31 => null,
             default => null,
         };
 
@@ -3181,12 +3183,8 @@ class StatisticsRepository extends ServiceEntityRepository
         // Ignorée si l'appelant demande explicitement les biens SORTIS via le filtre `statuts`
         // (ex. ?statuts[]=SORTIS ou ?statuts[]=SORTIE pour les mesurer), ou passe $excludeSortis=false (requêtes qui
         // mesurent les sorties elles-mêmes).
-<<<<<<< HEAD
         $excludeSortisRequested = !in_array('SORTIS', $filters['statuts'] ?? [], true) && !in_array('SORTIE', $filters['statuts'] ?? [], true);
         if ($excludeSortis && $excludeSortisRequested) {
-=======
-        if ($excludeSortis && !in_array('SORTIE', $filters['statuts'] ?? [], true)) {
->>>>>>> origin/marceldev
             $qb->leftJoin("{$alias}.sortie", 'default_excl_sortie')
                 ->andWhere('(default_excl_sortie.id IS NULL OR default_excl_sortie.isDelete = :defaultExclSortieDelete)')
                 ->setParameter('defaultExclSortieDelete', true);
@@ -3245,11 +3243,7 @@ class StatisticsRepository extends ServiceEntityRepository
         if (!empty($filters['statuts'])) {
             $statutConditions = [];
 
-<<<<<<< HEAD
             if (in_array('SORTIS', $filters['statuts'], true) || in_array('SORTIE', $filters['statuts'], true)) {
-=======
-            if (in_array('SORTIE', $filters['statuts'], true)) {
->>>>>>> origin/marceldev
                 $qb->leftJoin("{$alias}.sortie", 'statut_sortie_filter');
                 $statutConditions[] = '(statut_sortie_filter.id IS NOT NULL AND statut_sortie_filter.isDelete = false)';
             }
@@ -3307,12 +3301,13 @@ class StatisticsRepository extends ServiceEntityRepository
                 ->setParameter('exerciceFilter', (string) $filters['exercice']);
         }
 
-        // Security Data Isolation (Voter / Role mapping)
+        // Security Data Isolation (Voter / Role mapping) — barrière de sécurité, pas un simple
+        // filtre par défaut : le service de l'utilisateur connecté + tous ses descendants
+        // d'organigramme, jamais contournable en modifiant le filtre `services_id` côté client.
         if (!empty($filters['secured_service_id'])) {
-            // Join is already conditionally done earlier, but to be sure we do it again exclusively
             $qb->innerJoin("{$alias}.services", 'sec_s_filter')
-                ->andWhere('sec_s_filter.id = :securedServiceId')
-                ->setParameter('securedServiceId', $filters['secured_service_id']);
+                ->andWhere('sec_s_filter.id IN (:securedServiceId)')
+                ->setParameter('securedServiceId', $this->resolveServicesIdWithDescendants([(int) $filters['secured_service_id']]));
         }
 
         if (!empty($filters['secured_region_id'])) {
@@ -3322,6 +3317,4 @@ class StatisticsRepository extends ServiceEntityRepository
                 ->setParameter('securedRegionId', $filters['secured_region_id']);
         }
     }
-
-
 }

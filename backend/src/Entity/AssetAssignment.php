@@ -8,6 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: AssetAssignmentRepository::class)]
 #[ORM\Table(name: 'asset_assignment')]
@@ -42,6 +43,7 @@ class AssetAssignment
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['asset_assignment:detail', 'asset:detail'])]
+    #[Assert\Choice(choices: ['AFFECTATION', 'RESTITUTION'], message: 'Le type d\'affectation doit être AFFECTATION ou RESTITUTION.')]
     private ?string $typeAffectation = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]

@@ -7,6 +7,7 @@ use App\Repository\ConsumableTransferRepository;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableStockManager;
 use App\Service\ConsumableTransferResponseBuilder;
+use App\Service\ConsumableTransferStockManager;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,6 +47,7 @@ final class ConsumeConsumableTransferController extends AbstractController
         Request $request,
         ConsumableTransferRepository $consumableTransferRepository,
         ConsumableStockManager $stockManager,
+        ConsumableTransferStockManager $transferStockManager,
         ConsumableTransferResponseBuilder $responseBuilder,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
@@ -64,7 +66,12 @@ final class ConsumeConsumableTransferController extends AbstractController
         }
 
         $quantityConsumed = (float) $payload['quantityConsumed'];
-        $quantityReceived = (float) $transfer->getQuantite();
+        // Sur un transfert INITIAL, "quantite" vaut 0 (ce n'est pas un vrai transfert) : la
+        // quantité réellement disponible pour ce service est la quantité initiale du
+        // consomptible, portée par stockActuel à la création de ce transfert.
+        $quantityReceived = $transfer->getStatut() === ConsumableTransfer::STATUT_INITIAL
+            ? (float) $transfer->getConsumable()->getQuantite()
+            : (float) $transfer->getQuantite();
 
         if ($quantityConsumed < 0) {
             return $apiResponse->error(
@@ -83,6 +90,15 @@ final class ConsumeConsumableTransferController extends AbstractController
         $transfer->setQuantityConsumed((string) $quantityConsumed);
         $consumableTransferRepository->save($transfer);
         $stockManager->recalculateAndPersist($transfer->getConsumable());
+
+        // Rafraîchit le stockActuel persisté sur les transferts du service destinataire
+        // (celui affiché dans la liste des transferts), qui doit refléter la consommation.
+        if ($transfer->getServiceDestination()) {
+            $transferStockManager->recalculateAllStocks(
+                $transfer->getConsumable()->getId(),
+                $transfer->getServiceDestination()->getId()
+            );
+        }
 
         return $apiResponse->success(
             $responseBuilder->buildDetail($transfer),

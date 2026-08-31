@@ -124,6 +124,9 @@ final class AssetManagementService
         if (array_key_exists('activeReevaluation', $payload)) {
             $asset->setActiveReevaluation(filter_var($payload['activeReevaluation'], FILTER_VALIDATE_BOOLEAN));
         }
+        if (array_key_exists('activeDepreciation', $payload)) {
+            $asset->setActiveDepreciation(filter_var($payload['activeDepreciation'], FILTER_VALIDATE_BOOLEAN));
+        }
 
         $this->applyPayload($asset, $payload);
         $this->attachFiles($asset, $photos, $documents, $documentLabels);
@@ -195,6 +198,9 @@ public function update(
     }
     if (array_key_exists('activeReevaluation', $payload)) {
         $asset->setActiveReevaluation(filter_var($payload['activeReevaluation'], FILTER_VALIDATE_BOOLEAN));
+    }
+    if (array_key_exists('activeDepreciation', $payload)) {
+        $asset->setActiveDepreciation(filter_var($payload['activeDepreciation'], FILTER_VALIDATE_BOOLEAN));
     }
 
     $this->applyPayload($asset, $payload);
@@ -501,6 +507,20 @@ private function processChampsValeurs(Asset $asset, array $champsValeurs): void
         }
         if (array_key_exists('fournisseurPays', $payload)) {
             $asset->setFournisseurPays($this->nullableString($payload['fournisseurPays']));
+        }
+
+        // ✅ Gestion de l'utilisateur de restitution
+        if (array_key_exists('user_restitution_id', $payload)) {
+            $userRestitutionId = $payload['user_restitution_id'];
+            if (null === $userRestitutionId || '' === $userRestitutionId) {
+                $asset->setUserRestitution(null);
+            } else {
+                $userRestitution = $this->userRepository->find((int) $userRestitutionId);
+                if (!$userRestitution) {
+                    throw ResourceNotFoundException::for('utilisateur de restitution');
+                }
+                $asset->setUserRestitution($userRestitution);
+            }
         }
 
         if ($this->hasRelationKey($payload, 'category_id', 'category_ids')) {

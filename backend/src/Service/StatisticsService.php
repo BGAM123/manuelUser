@@ -456,24 +456,37 @@ final class StatisticsService
         ], fn($v) => $v !== null);
     }
 
+    /**
+     * Isolation des données par service pour les utilisateurs non-administrateurs : ils ne
+     * voient que les statistiques de leur propre service + ses descendants d'organigramme
+     * (cf. StatisticsRepository::resolveServicesIdWithDescendants), quel que soit le filtre
+     * `services_id` envoyé par le client — barrière de sécurité, pas une simple valeur par
+     * défaut contournable (demande explicite).
+     *
+     * "Administrateur" ici suit exactement la même convention que le frontend
+     * (useIsAdmin()) : un rôle métier (assignedRoles, PAS le tableau Symfony
+     * User::$roles qui reste toujours ['ROLE_USER'] dans cette application — aucun
+     * ROLE_ADMIN/ROLE_GESTIONNAIRE_* n'est jamais assigné, cf. CreateUserCommand /
+     * UserRepository::createUser) dont le nom contient "admin" (insensible à la casse).
+     */
     private function buildSecuredFilters(StatisticsFilter $filter): array
     {
         $filters = $this->filterToArray($filter);
         $user = $this->security->getUser();
 
-        if ($user) {
-            $roles = $user->getRoles();
-            if (!in_array('ROLE_ADMIN', $roles, true)) {
-                if (in_array('ROLE_GESTIONNAIRE_REGIONAL', $roles, true)) {
-                    $uService = $user->getService();
-                    if ($uService && $uService->getRegion()) {
-                        $filters['secured_region_id'] = $uService->getRegion()->getId();
-                    }
-                } elseif (in_array('ROLE_GESTIONNAIRE_STRUCTURE', $roles, true)) {
-                    $uService = $user->getService();
-                    if ($uService) {
-                        $filters['secured_service_id'] = $uService->getId();
-                    }
+        if ($user instanceof User) {
+            $isAdmin = false;
+            foreach ($user->getAssignedRoles() as $role) {
+                if (null !== $role->getNom() && preg_match('/admin/i', $role->getNom())) {
+                    $isAdmin = true;
+                    break;
+                }
+            }
+
+            if (!$isAdmin) {
+                $uService = $user->getService();
+                if ($uService) {
+                    $filters['secured_service_id'] = $uService->getId();
                 }
             }
         }

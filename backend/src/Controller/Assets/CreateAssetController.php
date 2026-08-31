@@ -131,6 +131,7 @@ final class CreateAssetController extends AbstractController
                     new OA\Property(property: 'latitude', type: 'number', format: 'float', nullable: true, example: 48.8566, description: 'Optionnel. Doit être fourni avec longitude. Plage: -90 à 90.'),
                     new OA\Property(property: 'longitude', type: 'number', format: 'float', nullable: true, example: 2.3522, description: 'Optionnel. Doit être fourni avec latitude. Plage: -180 à 180.'),
                     new OA\Property(property: 'securityMode', type: 'string', nullable: true, example: 'ARMOIRE', description: 'Mode de sécurisation du bien. Si fourni, crée automatiquement une sécurisation avec la date du jour.'),
+                    new OA\Property(property: 'user_restitution_id', type: 'integer', nullable: true, example: 8, description: 'Optionnel. ID de l\'utilisateur de restitution par défaut pour ce bien.'),
                 ]
             )
         )

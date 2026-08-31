@@ -45,7 +45,7 @@ final class ConsumableTransferResponseBuilder
             'type' => $transfer->getType(),
             'statut' => $transfer->getStatut(),
             'quantite' => $transfer->getQuantite(),
-            'stockActuel' => $transfer->getStockActuel(), // 🔥 NOUVEAU CHAMP
+            'stockActuel' => $transfer->getStockActuel(), 
             'dateTransfert' => $transfer->getDateTransfert()?->format('Y-m-d'),
             'observations' => $transfer->getObservations(),
             'createdAt' => $transfer->getCreatedAt()?->format('Y-m-d H:i:s'),
@@ -59,7 +59,7 @@ final class ConsumableTransferResponseBuilder
             $data['pieceJointes'] = $this->buildPieceJointes($transfer->getPieceJointes());
             $data['consumableBsp'] = $transfer->getConsumableBsp() ? $this->buildConsumableBsp($transfer->getConsumableBsp()) : null;
             $data['acknowledgedAt'] = $transfer->getAcknowledgedAt()?->format('Y-m-d H:i:s');
-            $data['stockActuel'] = $transfer->getStockActuel(); // Déjà ajouté mais on le garde
+            $data['stockActuel'] = $transfer->getStockActuel(); 
         }
 
         return $data;

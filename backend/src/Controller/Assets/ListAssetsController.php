@@ -37,6 +37,7 @@ final class ListAssetsController extends AbstractController
     #[OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string'), description: 'Filtrer par statut du bien (ex: ACTIF, EN MAINTENANCE, SORTIS).')]
     #[OA\Parameter(name: 'securise', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens sécurisés (true) ou non sécurisés (false).')]
     #[OA\Parameter(name: 'received', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens recus (true) ou non recu (false).')]
+    #[OA\Parameter(name: 'restitue', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens restitués (true) ou non restitués (false).')]
     #[OA\Response(
         response: 200,
         description: 'Success',
@@ -124,6 +125,7 @@ final class ListAssetsController extends AbstractController
         $statut = $request->query->get('statut');
         $securise = $request->query->get('securise');
         $received = $request->query->get('received');
+        $restitue = $request->query->get('restitue');
 
         // Un category_id peut pointer vers une catégorie soft-deletée : on la résout
         // toujours vers une catégorie active (ou la catégorie par défaut) avant de filtrer,
@@ -158,8 +160,8 @@ final class ListAssetsController extends AbstractController
             }
         }
 
-        $items = $assetRepository->findPaginated($page, $limit, $isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received);
-        $total = $assetRepository->countAll($isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received);
+        $items = $assetRepository->findPaginated($page, $limit, $isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue);
+        $total = $assetRepository->countAll($isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue);
 
         $data = array_map(static fn ($asset) => $responseBuilder->buildListItem($asset), $items);
 

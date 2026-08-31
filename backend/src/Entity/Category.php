@@ -97,11 +97,13 @@ class Category
      *
      * @var Collection<int, Champ>
      */
-    #[ORM\ManyToMany(targetEntity: Champ::class, inversedBy: 'categories')]
-    #[ORM\JoinTable(name: 'category_champ')]
-    #[ORM\JoinColumn(name: 'category_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[ORM\InverseJoinColumn(name: 'champ_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[Groups(['category:detail'])]
+    // #[ORM\ManyToMany(targetEntity: Champ::class, inversedBy: 'categories')]
+    // #[ORM\JoinTable(name: 'category_champ')]
+    // #[ORM\JoinColumn(name: 'category_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    // #[ORM\InverseJoinColumn(name: 'champ_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    // #[Groups(['category:detail'])]
+    // private Collection $champs;
+    #[ORM\ManyToMany(targetEntity: Champ::class, mappedBy: 'categories')]
     private Collection $champs;
 
     public function __construct()

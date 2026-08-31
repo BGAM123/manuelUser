@@ -43,6 +43,12 @@ final class ListConsumablesController extends AbstractController
         schema: new OA\Schema(type: 'string', enum: ['false', 'true', 'all'], default: 'false'),
         description: 'false (défaut) = consomptibles actifs uniquement. true = consomptibles supprimés (corbeille) uniquement. all = tous.'
     )]
+    #[OA\Parameter(
+        name: 'category_ids',
+        in: 'query',
+        schema: new OA\Schema(type: 'string'),
+        description: 'Filtrer par IDs de catégories (séparés par des virgules, ex: 1,2,3)'
+    )]
     #[OA\Response(
         response: 200,
         description: 'Success',
@@ -87,6 +93,13 @@ final class ListConsumablesController extends AbstractController
         $serviceId = $request->query->has('service_id') ? $request->query->getInt('service_id') : null;
         $isDelete = $request->query->get('is_delete', 'false');
 
+        // 🔥 RÉCUPÉRER LES CATÉGORIES
+        $categoryIds = null;
+        $categoryIdsParam = $request->query->get('category_ids');
+        if ($categoryIdsParam) {
+            $categoryIds = array_map('intval', explode(',', $categoryIdsParam));
+        }
+
         $allServicesRequested = filter_var($request->query->get('all_services', false), FILTER_VALIDATE_BOOLEAN);
         $user = $this->getUser();
         if ($user && method_exists($user, 'getId')) {
@@ -104,8 +117,8 @@ final class ListConsumablesController extends AbstractController
             }
         }
 
-        $items = $consumableRepository->findPaginated($page, $limit, $search, $serviceId, $isDelete);
-        $total = $consumableRepository->countAll($search, $serviceId, $isDelete);
+        $items = $consumableRepository->findPaginated($page, $limit, $search, $serviceId, $isDelete, $categoryIds);
+        $total = $consumableRepository->countAll($search, $serviceId, $isDelete, $categoryIds);
 
         // 🔥 CALCULER LE STOCK POUR CHAQUE CONSOMMABLE
         $data = array_map(function ($consumable) use ($transferRepository) {

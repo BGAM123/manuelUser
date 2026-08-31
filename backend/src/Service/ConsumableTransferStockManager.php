@@ -232,19 +232,22 @@ public function recalculateAllStocks(int $consumableId, int $serviceId): void
         // 1. Stock initial (INITIAL)
         if ($transfer->getStatut() === ConsumableTransfer::STATUT_INITIAL) {
             // Le service destination du transfert INITIAL est le propriétaire du stock.
-            // Ce n'est pas un transfert réel (quantite = 0) : le stock d'ouverture est
-            // porté par stockActuel, déjà positionné à la quantité initiale du consomptible.
+            // Ce n'est pas un transfert réel (quantite = 0) : le stock d'ouverture vient de
+            // Consumable::quantite (source stable, jamais réécrite par cette méthode), diminué
+            // de ce qui a déjà été consommé sur ce transfert — pour rester idempotent d'un
+            // recalcul à l'autre, on ne relit jamais stockActuel qu'on vient de réécrire.
             if ($transfer->getServiceDestination()->getId() === $serviceId) {
-                $stock = (float) $transfer->getStockActuel();
+                $stock = (float) $transfer->getConsumable()->getQuantite() - (float) ($transfer->getQuantityConsumed() ?? '0');
                 $transfer->setStockActuel((string) $stock);
                 $this->entityManager->persist($transfer);
             }
         }
         // 2. Transfert reçu (TRANSFERE en destination)
         elseif ($transfer->getStatut() === ConsumableTransfer::STATUT_TRANSFERE) {
-            // Si le service est le DESTINATION du transfert → ENTRÉE
+            // Si le service est le DESTINATION du transfert → ENTRÉE, diminuée de ce qui a déjà
+            // été consommé sur ce transfert précis.
             if ($transfer->getServiceDestination()->getId() === $serviceId) {
-                $stock += (float) $transfer->getQuantite();
+                $stock += (float) $transfer->getQuantite() - (float) ($transfer->getQuantityConsumed() ?? '0');
                 // Mettre à jour stockActuel uniquement pour le service destination
                 $transfer->setStockActuel((string) $stock);
                 $this->entityManager->persist($transfer);

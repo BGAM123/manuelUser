@@ -26,10 +26,12 @@ class GestionStockConsommableService
         $transfertsRecus = $this->consumableTransferRepository->sumQuantiteReceivedByConsumableAndService($consumableId, $serviceId);
         $transfertsEffectues = $this->consumableTransferRepository->sumQuantiteSentByConsumableAndService($consumableId, $serviceId);
         $sorties = $this->consumableTransferRepository->sumSortiesByConsumableAndService($consumableId, $serviceId);
+        $consommes = $this->consumableTransferRepository->sumQuantityConsumedByConsumableAndService($consumableId, $serviceId);
 
         $stockActuel = bcadd($stockInitial, $transfertsRecus, 2);
         $stockActuel = bcsub($stockActuel, $transfertsEffectues, 2);
         $stockActuel = bcsub($stockActuel, $sorties, 2);
+        $stockActuel = bcsub($stockActuel, $consommes, 2);
 
         return max(0, (float) $stockActuel);
     }

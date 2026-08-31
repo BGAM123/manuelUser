@@ -120,10 +120,21 @@ class Champ
     #[Groups(['champ:detail'])]
     private Collection $inputs;
 
+    // /**
+    //  * @var Collection<int, Category>
+    //  */
+    // #[ORM\ManyToMany(targetEntity: Category::class, mappedBy: 'champs')]
+    // private Collection $categories;
+
     /**
      * @var Collection<int, Category>
      */
-    #[ORM\ManyToMany(targetEntity: Category::class, mappedBy: 'champs')]
+    #[ORM\ManyToMany(targetEntity: Category::class, inversedBy: 'champs')]
+    #[ORM\JoinTable(name: 'category_champ')]
+    #[ORM\JoinColumn(name: 'champ_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'category_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['champ:detail', 'champ:list'])]
+    #[MaxDepth(1)]  // Évite les boucles infinies
     private Collection $categories;
 
     public function __construct()

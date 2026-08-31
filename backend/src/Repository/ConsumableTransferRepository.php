@@ -195,61 +195,33 @@ public function getCurrentStock(int $consumableId, int $serviceId): float
         ->orderBy('ct.id', 'ASC')
         ->setParameter('consumableId', $consumableId)
         ->setParameter('serviceId', $serviceId);
-    
+
     $transfers = $qb->getQuery()->getResult();
-    
-    // Calculer le stock dynamiquement
+
     $stock = 0;
-    
+
     foreach ($transfers as $transfer) {
-        // 1. Stock initial (INITIAL) : pas un transfert réel, quantite = 0.
-        // Le stock d'ouverture est porté par stockActuel.
         if ($transfer->getStatut() === ConsumableTransfer::STATUT_INITIAL) {
-            if ($transfer->getServiceDestination()->getId() === $serviceId) {
-                $stock = (float) $transfer->getStockActuel();
+            if ($transfer->getServiceDestination()?->getId() === $serviceId) {
+                
+                $stock = (float) $transfer->getConsumable()->getQuantite() - (float) ($transfer->getQuantityConsumed() ?? '0');
             }
-        }
-        // 2. Transfert reçu (TRANSFERE en destination)
-        elseif ($transfer->getStatut() === ConsumableTransfer::STATUT_TRANSFERE) {
-            // Si le service est le DESTINATION du transfert → ENTRÉE
-            if ($transfer->getServiceDestination()->getId() === $serviceId) {
+        } elseif ($transfer->getStatut() === ConsumableTransfer::STATUT_TRANSFERE) {
+            if ($transfer->getServiceDestination()?->getId() === $serviceId) {
                 $stock += (float) $transfer->getQuantite();
-            }
-            // Si le service est la SOURCE du transfert → SORTIE
-            elseif ($transfer->getServiceSource() && $transfer->getServiceSource()->getId() === $serviceId) {
+                $stock -= (float) ($transfer->getQuantityConsumed() ?? '0');
+            } elseif ($transfer->getServiceSource()?->getId() === $serviceId) {
                 $stock -= (float) $transfer->getQuantite();
             }
-        }
-        // 3. Sortie BSP (SORTI en source)
-        elseif ($transfer->getStatut() === ConsumableTransfer::STATUT_SORTI) {
-            if ($transfer->getServiceSource() && $transfer->getServiceSource()->getId() === $serviceId) {
+        } elseif ($transfer->getStatut() === ConsumableTransfer::STATUT_SORTI) {
+            if ($transfer->getServiceSource()?->getId() === $serviceId) {
                 $stock -= (float) $transfer->getQuantite();
             }
         }
     }
-    
+
     return max(0, $stock);
 }
-
-    /**
-     * 🔥 MÉTHODE MODIFIÉE
-     * Récupère tous les transferts pour un service (historique complet)
-     * Cherche à la fois dans serviceDestination et serviceSource
-     */
-    public function findByConsumableAndService(
-        int $consumableId,
-        int $serviceId
-    ): array {
-        return $this->createQueryBuilder('ct')
-            ->where('ct.consumable = :consumableId')
-            ->andWhere('(ct.serviceDestination = :serviceId OR ct.serviceSource = :serviceId)')
-            ->andWhere('ct.isDelete = false')
-            ->orderBy('ct.id', 'ASC')
-            ->setParameter('consumableId', $consumableId)
-            ->setParameter('serviceId', $serviceId)
-            ->getQuery()
-            ->getResult();
-    }
 
     /**
      * 🔥 NOUVELLE MÉTHODE
@@ -310,6 +282,22 @@ public function getCurrentStock(int $consumableId, int $serviceId): float
             ->setParameter('consumableId', $consumableId)
             ->setParameter('serviceId', $serviceId)
             ->setParameter('statut', ConsumableTransfer::STATUT_TRANSFERE)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $result ?: '0';
+    }
+
+    public function sumQuantityConsumedByConsumableAndService(int $consumableId, int $serviceId): string
+    {
+        $result = $this->createQueryBuilder('ct')
+            ->select('COALESCE(SUM(ct.quantityConsumed), 0)')
+            ->where('ct.consumable = :consumableId')
+            ->andWhere('ct.serviceDestination = :serviceId')
+            ->andWhere('ct.isDelete = false')
+            ->andWhere('ct.quantityConsumed IS NOT NULL')
+            ->setParameter('consumableId', $consumableId)
+            ->setParameter('serviceId', $serviceId)
             ->getQuery()
             ->getSingleScalarResult();
 

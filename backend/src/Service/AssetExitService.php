@@ -79,7 +79,7 @@ final class AssetExitService
         $this->exitRepository->save($exit);
 
         // Mettre le statut à SORTIS
-        $asset->setStatut('SORTIE');
+        $asset->setStatut('SORTIS');
 
         // ✅ Si c'est une réforme, appliquer l'état "Réformé"
         $isReforme = $this->isReforme($payload);

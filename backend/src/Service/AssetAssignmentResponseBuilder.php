@@ -71,6 +71,11 @@ final class AssetAssignmentResponseBuilder
             'utilisateurDuService' => $serviceUserData, // Utilisateur lié au service (si différent)
             'piecesJointes' => $this->buildPiecesJointes($assignment),
             'createdAt' => $assignment->getCreatedAt()?->format('Y-m-d H:i:s'),
+            'createdBy' => $assignment->getCreatedBy() ? [
+                'id' => $assignment->getCreatedBy()->getId(),
+                'firstName' => $assignment->getCreatedBy()->getFirstName(),
+                'lastName' => $assignment->getCreatedBy()->getLastName(),
+            ] : null,
             'accuseReception' => $this->buildAccuseReception($ack),
             'notification' => $this->buildNotificationStatus($notification),
         ];

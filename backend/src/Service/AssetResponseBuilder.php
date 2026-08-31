@@ -139,6 +139,24 @@ final class AssetResponseBuilder
     }
 
     /**
+     * ✅ Détermine si un bien est actuellement restitué
+     * Un bien est restitué si sa dernière affectation est de type RESTITUTION, detenteur = true, et dateFin IS NULL
+     *
+     * @return bool
+     */
+    private function isAssetRestitue(Asset $asset): bool
+    {
+        $lastAssignment = $asset->getAssignments()->last();
+        if (!$lastAssignment) {
+            return false;
+        }
+
+        return $lastAssignment->getTypeAffectation() === 'RESTITUTION'
+            && $lastAssignment->isDetenteur()
+            && $lastAssignment->getDateFin() === null;
+    }
+
+    /**
      * Listing allégé (sans photos, PJ, fournisseur).
      *
      * @return array<string, mixed>
@@ -159,6 +177,9 @@ final class AssetResponseBuilder
 
         // ✅ Résoudre le statut d'accusé de réception du détenteur actuel
         $received = $this->resolveCurrentReceived($asset);
+
+        // ✅ Déterminer si le bien est restitué
+        $isRestitue = $this->isAssetRestitue($asset);
 
         // ✅ Calculer l'exercice à partir du projet
         $exercice = null;
@@ -208,6 +229,8 @@ final class AssetResponseBuilder
             'securise' => $isSecurised,
             // ✅ Ajout du champ received (dynamique, basé sur détenteur actuel)
             'received' => $received,
+            // ✅ Ajout du champ isRestitue (dynamique, basé sur l'affectation actuelle)
+            'isRestitue' => $isRestitue,
             'location' => $this->resolveLocation($asset),
             'maintenanceEnCours' => $this->resolveOpenMaintenance($asset),
             // 'coutTotalMaintenance' => $this->assetMaintenanceRepository->getTotalMaintenanceCostForAsset($asset),
@@ -287,6 +310,9 @@ final class AssetResponseBuilder
         // ✅ Résoudre le statut d'accusé de réception du détenteur actuel
         $received = $this->resolveCurrentReceived($asset);
 
+        // ✅ Déterminer si le bien est restitué
+        $isRestitue = $this->isAssetRestitue($asset);
+
         $photos = [];
         $documents = [];
         foreach ($asset->getPiecesJointes() as $piece) {
@@ -349,6 +375,13 @@ final class AssetResponseBuilder
             'champs' => $this->buildChamps($asset), // ✅ Ajouter cette ligne
             'activeAmortissement' => $asset->isActiveAmortissement(),
             'activeReevaluation' => $asset->isActiveReevaluation(),
+            'activeDepreciation' => $asset->isActiveDepreciation(),
+            'userRestitution' => $asset->getUserRestitution() ? [
+                'id' => $asset->getUserRestitution()->getId(),
+                'firstName' => $asset->getUserRestitution()->getFirstName(),
+                'lastName' => $asset->getUserRestitution()->getLastName(),
+                'matricule' => $asset->getUserRestitution()->getMatricule(),
+            ] : null,
             // 'seuil' => $asset->getSeuil(),
             // 'amortissement' => [
             //     'valeurAcquisition' => $depreciationResult->valeurAcquisition,
@@ -401,6 +434,8 @@ final class AssetResponseBuilder
             'securisations' => $lastSecurity,
             // ✅ Ajout du champ received (dynamique, basé sur détenteur actuel)
             'received' => $received,
+            // ✅ Ajout du champ isRestitue (dynamique, basé sur l'affectation actuelle)
+            'isRestitue' => $isRestitue,
             'coutTotalMaintenance' => $this->assetMaintenanceRepository->getTotalMaintenanceCostForAsset($asset),
             'createdAt' => $asset->getCreatedAt()?->format('Y-m-d H:i:s'),
             'updatedAt' => $asset->getUpdatedAt()?->format('Y-m-d H:i:s'),

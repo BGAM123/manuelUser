@@ -69,7 +69,7 @@ class EtatBien
     #[ORM\JoinTable(name: 'asset_type_etat_bien')]
     #[ORM\JoinColumn(name: 'etat_bien_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     #[ORM\InverseJoinColumn(name: 'asset_type_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[Groups(['etat_bien:detail'])]
+    #[Groups(['etat_bien:list', 'etat_bien:detail'])]
     private Collection $assetTypes;
 
     public function __construct()

@@ -121,6 +121,7 @@ class AssetAssignmentRepository extends ServiceEntityRepository
         ?int $userId = null,
         ?string $securise = null,
         ?string $received = null,
+        ?string $restitue = null,
     ): array {
         $qb = $this->createQueryBuilder('a')
             ->leftJoin('a.asset', 'asset')
@@ -181,10 +182,16 @@ class AssetAssignmentRepository extends ServiceEntityRepository
         // }
 
         if (null !== $statut) {
-            $qb->andWhere('asset.statut = :statut')->setParameter('statut', $statut);
+            if (in_array($statut, ['SORTIE', 'SORTIS'], true)) {
+                // Des biens sortis existent en base avec les deux graphies ('SORTIE' et
+                // 'SORTIS', selon la date de création — cf. AssetExitService) : on matche les deux.
+                $qb->andWhere('asset.statut IN (:statutsSortis)')->setParameter('statutsSortis', ['SORTIE', 'SORTIS']);
+            } else {
+                $qb->andWhere('asset.statut = :statut')->setParameter('statut', $statut);
+            }
         } else {
-            // Par défaut, exclure les biens SORTIE
-            $qb->andWhere('asset.statut != :statutDefault')->setParameter('statutDefault', 'SORTIE');
+            // Par défaut, exclure les biens sortis (les deux graphies existantes en base).
+            $qb->andWhere('asset.statut NOT IN (:statutsExclus)')->setParameter('statutsExclus', ['SORTIE', 'SORTIS']);
         }
 
         // ✅ Filtre par utilisateur connecté : uniquement les affectations où l'utilisateur est le détenteur actuel
@@ -215,6 +222,20 @@ class AssetAssignmentRepository extends ServiceEntityRepository
                 ->setParameter('received', $isReceived);
         }
 
+        // ✅ Filtre par restitution (via le typeAffectation)
+        if (null !== $restitue && '' !== trim($restitue)) {
+            $isRestitue = filter_var($restitue, FILTER_VALIDATE_BOOLEAN);
+            if ($isRestitue) {
+                // Affectations restituées : typeAffectation = RESTITUTION
+                $qb->andWhere('a.typeAffectation = :typeRestitution')
+                    ->setParameter('typeRestitution', 'RESTITUTION');
+            } else {
+                // Affectations non restituées : typeAffectation != RESTITUTION ou null
+                $qb->andWhere('(a.typeAffectation != :typeRestitution OR a.typeAffectation IS NULL)')
+                    ->setParameter('typeRestitution', 'RESTITUTION');
+            }
+        }
+
         return $qb->getQuery()->getResult();
     }
 
@@ -233,6 +254,7 @@ class AssetAssignmentRepository extends ServiceEntityRepository
         ?int $userId = null,
         ?string $securise = null,
         ?string $received = null,
+        ?string $restitue = null,
     ): int {
         $qb = $this->createQueryBuilder('a')
             ->select('COUNT(DISTINCT a.id)')
@@ -280,12 +302,17 @@ class AssetAssignmentRepository extends ServiceEntityRepository
         }
 
         if (null !== $statut) {
-            $qb->andWhere('asset.statut = :statut')
-               ->setParameter('statut', $statut);
+            if (in_array($statut, ['SORTIE', 'SORTIS'], true)) {
+                $qb->andWhere('asset.statut IN (:statutsSortis)')
+                   ->setParameter('statutsSortis', ['SORTIE', 'SORTIS']);
+            } else {
+                $qb->andWhere('asset.statut = :statut')
+                   ->setParameter('statut', $statut);
+            }
         } else {
-            // Par défaut, exclure les biens SORTIE
-            $qb->andWhere('asset.statut != :statutDefault')
-               ->setParameter('statutDefault', 'SORTIE');
+            // Par défaut, exclure les biens sortis (les deux graphies existantes en base).
+            $qb->andWhere('asset.statut NOT IN (:statutsExclus)')
+               ->setParameter('statutsExclus', ['SORTIE', 'SORTIS']);
         }
 
         // ✅ Filtre par utilisateur connecté : uniquement les affectations où l'utilisateur est le détenteur actuel
@@ -316,6 +343,20 @@ class AssetAssignmentRepository extends ServiceEntityRepository
             $isReceived = filter_var($received, FILTER_VALIDATE_BOOLEAN);
             $qb->andWhere('a.received = :received')
                 ->setParameter('received', $isReceived);
+        }
+
+        // ✅ Filtre par restitution (via le typeAffectation)
+        if (null !== $restitue && '' !== trim($restitue)) {
+            $isRestitue = filter_var($restitue, FILTER_VALIDATE_BOOLEAN);
+            if ($isRestitue) {
+                // Affectations restituées : typeAffectation = RESTITUTION
+                $qb->andWhere('a.typeAffectation = :typeRestitution')
+                    ->setParameter('typeRestitution', 'RESTITUTION');
+            } else {
+                // Affectations non restituées : typeAffectation != RESTITUTION ou null
+                $qb->andWhere('(a.typeAffectation != :typeRestitution OR a.typeAffectation IS NULL)')
+                    ->setParameter('typeRestitution', 'RESTITUTION');
+            }
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult();
