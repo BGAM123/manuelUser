@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /configuration
+Disallow: /biens
+Disallow: /inventaires
+Disallow: /programmation
+Disallow: /maintenance
+Disallow: /statistiques
+Disallow: /dashboard

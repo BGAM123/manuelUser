@@ -1,0 +1,216 @@
+{# templates/email/otp_code.html.twig #}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code OTP - Double Authentification</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .email-wrapper {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .header {
+            background: #ffffff;
+            color: #1e3a8a;
+            padding: 30px 20px;
+            text-align: center;
+            border-bottom: 3px solid #3b82f6;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .header-left {
+            text-align: left;
+            flex: 1;
+            font-size: 11px;
+            line-height: 1.5;
+            font-weight: 500;
+            text-transform: uppercase;
+            color: #000000;
+        }
+        .header-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 20px;
+        }
+        .header-center img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+        }
+        .header-right {
+            text-align: right;
+            flex: 1;
+            font-size: 11px;
+            line-height: 1.5;
+            font-weight: 500;
+            text-transform: uppercase;
+            color: #000000;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e3a8a;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            color: #374151;
+        }
+        .greeting {
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        .otp-box {
+            background-color: #f0f4f8;
+            border: 2px solid #3498db;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .otp-code {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3498db;
+            letter-spacing: 4px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+        }
+        .validity-info {
+            color: #666;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #856404;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #999;
+        }
+        .security-note {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #0c5460;
+            margin: 20px 0;
+        }
+        @media only screen and (max-width: 600px) {
+            .header-top {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .header-left,
+            .header-right {
+                text-align: center;
+            }
+            .header-center {
+                order: -1;
+                padding: 10px 0;
+            }
+            .info-item {
+                flex-direction: column;
+            }
+            .info-label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div class="header-left">
+                    REPUBLIC OF CAMEROON<br>
+                    Peace - Work - Fatherland<br>
+                    MINISTRY OF LIVESTOCK<br>
+                    FISHERIES AND ANIMAL INDUSTRIES
+                </div>
+                <div class="header-center">
+                    <img src="https://cdeno.org/wp-content/uploads/2023/11/LOGO-MINEPIA-1024x1024.jpg" alt="Logo MINEPIA">
+                </div>
+                <div class="header-right">
+                    RÉPUBLIQUE DU CAMEROUN<br>
+                    Paix - Travail - Patrie<br>
+                    MINISTÈRE DE L'ÉLEVAGE,<br>
+                    DES PÊCHES ET INDUSTRIES ANIMALES
+                </div>
+            </div>
+            <h1> Code de vérification </h1>
+            <p>Ministère de l'Élevage, des Pêches et des Industries Animales</p>
+        </div>
+        <div class="email-wrapper">
+
+            <div class="content">
+
+                <div class="greeting">
+                    <p>Bonjour <strong>{{ firstName }}</strong>,</p>
+                    <p>Une demande de connexion à votre compte a été effectuée. Saisissez le code ci-dessous pour valider votre authentification :</p>
+                </div>
+
+                <div class="otp-box">
+                    <div class="otp-label">Votre code de sécurité OTP</div>
+                    <div class="otp-code">{{ otp }}</div>
+                    <div class="validity-info">
+                        ⏱️ Ce code expire dans {{ validityMinutes }} minutes.
+                    </div>
+                </div>
+
+                <div class="security-note">
+                    <strong>🛡️ Consigne de sécurité :</strong> Ne partagez jamais ce code. Les agents du Ministère ou du Support ne vous le demanderont jamais.
+                </div>
+
+                <div class="warning">
+                    <strong>Vous n'êtes pas à l'origine de cette demande ?</strong><br>
+                    Si vous n'avez pas essayé de vous connecter, vous pouvez ignorer cet email en toute sécurité. Nous vous recommandons toutefois de changer votre mot de passe.
+                </div>
+            </div>
+            <div class="footer">
+                <p>Cet email a été généré automatiquement. Veuillez ne pas répondre à cet email.</p>
+                <p>
+                    Cordialement,
+                    <strong>MINEPIA - Ministère de l'Élevage, des Pêches et des Industries Animales</strong>
+                </p>
+                <p>&copy; {{ "now"|date("Y") }} MINEPIA. Tous droits réservés.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

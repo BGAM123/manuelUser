@@ -1,0 +1,216 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Gestion du patrimoine api
+            description: REST API de gestion du patrimoine  .
+            version: 1.0.0
+
+        # --- TAGS FOR API ENDPOINTS ORDER ---
+        tags:
+            - name: Authentication
+              description: Secure token generation and user authentication entry points.
+            - name: Users
+              description: User account and profile management operations.
+            - name: Profile
+              description: Authenticated user profile and personal account management.
+            - name: Services
+              description: Gestion de l'organigramme (services et postes hiérarchiques).
+            - name: Type services
+              description: Gestion des types d'organigrammes (catégories de services).
+            - name: Roles
+              description: Gestion des rôles métier et de leurs permissions.
+            - name: Groupes
+              description: Gestion des groupes d'utilisateurs et de leurs permissions héritées.
+            - name: Permissions
+              description: Gestion des permissions techniques du système.
+            - name: Projects
+              description: Gestion des projets patrimoniaux et des utilisateurs qui y sont affectés.
+            - name: Categories
+              description: Gestion des catégories de biens du patrimoine (parent hiérarchique des types de biens).
+            - name: AssetTypes
+              description: Gestion des types de biens du patrimoine, chacun rattaché à une catégorie.
+            - name: AssetSubTypes
+              description: Gestion des sous-types de biens du patrimoine, chacun rattaché à un type de bien.
+            - name: Regions
+              description: Gestion des régions administratives du Cameroun (niveau 1).
+            - name: Departements
+              description: Gestion des départements administratifs du Cameroun (niveau 2, rattachés à une région).
+            - name: Arrondissements
+              description: Gestion des arrondissements administratifs du Cameroun (niveau 3, rattachés à un département).
+            - name: LocationsImport
+              description: Import en lot des localités depuis une structure plate region/departement/arrondissement.
+            - name: EtatBiens
+              description: Gestion des états de biens patrimoniaux et de leurs associations aux types de biens.
+            - name: Champs
+              description: Gestion des champs personnalisés (nom, typeChamp, valeur) et associations aux catégories.
+            - name: Assets
+              description: Gestion des biens patrimoniaux (création multipart, affectations, historiques, pièces jointes).
+            - name: Asset Maintenances
+              description: Gestion des maintenances de biens patrimonaux avec pièces jointes et suivi d'intervention.
+            - name: Asset Assignments
+              description: Gestion des affectations de biens aux utilisateurs, services, ou projets avec historiques.
+            - name: Asset Reevaluations
+              description: Gestion des réévaluations de valeur de biens patrimonaux avec justificatifs.
+            - name: Asset Depreciations
+              description: Gestion des dépréciations et amortissements de biens patrimoniaux.
+            - name: Asset Exits
+              description: Gestion des sorties de biens patrimonaux (vente, destruction, transfert, etc.).
+            - name: Securities
+              description: Gestion des sécurisations de biens patrimoniaux.
+            - name: SecurityModes
+              description: Gestion des modes de sécurisation (Physique, Électronique, etc.)
+            - name: BSP
+              description: Gestion des Bons de Sortie Provisoire, documents de traçabilité rattachés à une sortie de bien (un BSP par bénéficiaire).
+            - name: Statistics
+              description: Statistiques globales du patrimoine avec filtres multiples.
+            - name: Logs
+              description: Consultation sécurisée des événements API_ACTION enregistrés dans les logs Symfony.
+            - name: Inventaire
+              description: Consulter l'inventaire complet de tous les biens regroupés par catégorie avec contexte administratif.
+            - name: Upload
+              description: Upload de fichiers multipart et création automatique de PieceJointe.
+            - name: Inputs
+              description: Gestion des valeurs de champs personnalisés
+            - name: Cartographie
+              description: Découpage territorial hiérarchique Région → Département → Arrondissement.
+            - name: Consomptibles
+              description: Gestion des consomptibles, entrées et transferts de stock.
+            - name: Consomptibles-Transferts
+              description: Gestion des transferts de consomptibles entre services.
+            - name: Notifications
+              description: Notifications et accusés de réception, rattachés aux affectations de biens et transferts de consomptibles.
+            - name: Stock
+              description: API unique de gestion du stock des biens patrimoniaux (résumé, statistiques, biens, mouvements, historique).
+            - name: Amortissements
+              description: Gestion des amortissements et dépréciations des biens patrimoniaux.
+          
+              
+        # ---------------------------------------------------
+
+        # --- Login Check path display configuration ---
+        paths:
+            /login_check:
+                post:
+                    tags:
+                        - Authentication
+                    summary: Obtain a JWT Bearer Token for user authentication
+                    description: Exchange valid user credentials (email/password) for a securely signed JWT token.
+                    requestBody:
+                        required: true
+                        content:
+                            application/json:
+                                schema:
+                                    type: object
+                                    required:
+                                        - email
+                                        - password
+                                    properties:
+                                        email:
+                                            type: string
+                                            format: email
+                                            description: The unique identifier email reference
+                                            example: john.doe@example.com
+                                        password:
+                                            type: string
+                                            description: The raw account security password string
+                                            example: SecretPassword123!
+                    responses:
+                        '200':
+                            description: Success - Returns the computed authentication token payload
+                            content:
+                                application/json:
+                                    schema:
+                                        type: object
+                                        properties:
+                                            success:
+                                                type: boolean
+                                                example: true
+                                            status:
+                                                type: integer
+                                                example: 200
+                                            message:
+                                                type: string
+                                                example: Authentication successful.
+                                            data:
+                                                type: object
+                                                properties:
+                                                    token:
+                                                        type: string
+                                                        description: The cryptographically signed JWT Bearer Token string
+                                                        example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                                                    refresh_token:
+                                                        type: string
+                                                        description: The opaque refresh token to request a new access token
+                                                        example: a1b2c3d4e5f6...
+                        '401':
+                            description: Unauthorized - Invalid credentials payload or structured data anomalies
+                            content:
+                                application/json:
+                                    schema:
+                                        type: object
+                                        properties:
+                                            code:
+                                                type: integer
+                                                example: 401
+                                            message:
+                                                type: string
+                                                example: Invalid credentials.
+        # ----------------------------------------
+
+        components:
+            securitySchemes:
+                BearerAuth:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+        security:
+            - BearerAuth: []
+    areas:
+        path_patterns:
+            - ^/auth
+            - ^/users
+            - ^/profile
+            - ^/refresh_token
+            - ^/services
+            - ^/organigramme
+            - ^/type-organigrammes
+            - ^/roles
+            - ^/groupes
+            - ^/permissions
+            - ^/projects
+            - ^/login_check
+            - ^/categories
+            - ^/consumables
+            # - ^/consumable-entries
+            - ^/consumable-transfers
+            - ^/notifications
+            - ^/asset-types
+            - ^/asset-sub-types
+            - ^/cartographie
+            - ^/regions
+            - ^/departements
+            - ^/arrondissements
+            - ^/locations
+            - ^/etat-biens
+            - ^/champs
+            - ^/inputs
+            - ^/assets
+            - ^/asset-maintenances
+            - ^/asset-assignments
+            - ^/asset-reevaluations
+            - ^/asset-depreciations
+            - ^/asset-exits
+            - ^/exit-types
+            - ^/securities
+            # - ^/security-modes
+            - ^/bsps
+            - ^/statistics
+            - ^/api/stats/dashboard$
+            - ^/inventaire
+            - ^/upload
+            - ^/logs
+            - ^/gestion_stock_bien
+            - ^/gestion_stock_comsomtible
+            - ^/amortissements
+            - ^/inventory-campaigns
+            

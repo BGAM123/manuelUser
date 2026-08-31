@@ -1,0 +1,67 @@
+﻿composer : PHP Warning:  Module "openssl" is already loaded in Unknown on line 
+0
+Au caractère Ligne:1 : 85
++ ... i_gestion_patrimoine'; composer install --no-interaction 2>&1 | Out-F ...
++                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PHP Warning:  M...known on line 0 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+Warning: Module "openssl" is already loaded in Unknown on line 0
+Installing dependencies from lock file (including require-dev)
+Verifying lock file contents can be installed on current platform.
+Nothing to install, update or remove
+Generating autoload files
+115 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+
+Run composer recipes at any time to see the status of your Symfony recipes.
+
+Executing script cache:clear [KO]
+ [KO]
+Script cache:clear returned with error code 255
+!!  
+!!  Warning: Module "openssl" is already loaded in Unknown on line 0
+!!  
+!!  Fatal error: Uncaught RuntimeException: Composer detected issues in your 
+platform: Your Composer dependencies require a PHP version ">= 8.3.0". You are 
+running 8.2.12. in C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\composer\platform_check.php:26
+!!  Stack trace:
+!!  #0 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\composer\autoload_real.php(25): require()
+!!  #1 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\autoload.php(22): 
+ComposerAutoloaderInit2eab9efdef154e5d8d657f9b8f2722b2::getLoader()
+!!  #2 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\autoload_runtime.php(5): 
+require_once('C:\\Users\\Admini...')
+!!  #3 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\bin\console(15): 
+require_once('C:\\Users\\Admini...')
+!!  #4 {main}
+!!    thrown in C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\composer\platform_check.php on line 26
+!!  PHP Warning:  Module "openssl" is already loaded in Unknown on line 0
+!!  PHP Fatal error:  Uncaught RuntimeException: Composer detected issues in 
+your platform: Your Composer dependencies require a PHP version ">= 8.3.0". 
+You are running 8.2.12. in C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\composer\platform_check.php:26
+!!  Stack trace:
+!!  #0 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\composer\autoload_real.php(25): require()
+!!  #1 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\autoload.php(22): 
+ComposerAutoloaderInit2eab9efdef154e5d8d657f9b8f2722b2::getLoader()
+!!  #2 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\autoload_runtime.php(5): 
+require_once('C:\\Users\\Admini...')
+!!  #3 C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\bin\console(15): 
+require_once('C:\\Users\\Admini...')
+!!  #4 {main}
+!!    thrown in C:\Users\Administrateur\Desktop\Minepia 
+Code\api_gestion_patrimoine\vendor\composer\platform_check.php on line 26
+!!  
+Script @auto-scripts was called via post-install-cmd

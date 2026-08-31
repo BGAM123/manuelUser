@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page { margin: 25px 35px; }
+        body { font-family: "DejaVu Sans", sans-serif; font-size: 11px; color: #000; }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .header-table td { width: 50%; text-align: center; vertical-align: top; padding: 4px; border: 1px solid #000; font-size: 10px; }
+        .header-table .bold { font-weight: bold; }
+        .header-table .italic { font-style: italic; }
+        h1 { text-align: center; font-size: 15px; text-decoration: underline; margin: 18px 0; }
+        .meta { margin-bottom: 10px; }
+        .meta span.label { display: inline-block; }
+        table.items { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table.items th, table.items td { border: 1px solid #000; padding: 4px 6px; font-size: 10px; text-align: center; }
+        table.items th { font-weight: bold; }
+        .signatures { width: 100%; border-collapse: collapse; margin-top: 40px; }
+        .signatures td { width: 33.33%; vertical-align: top; padding: 6px; font-size: 10px; }
+        .signatures .bold { font-weight: bold; }
+        .pour-acquit { text-align: center; margin-top: 30px; font-size: 11px; }
+        .pour-acquit .bold { font-weight: bold; }
+        .dotted { border-bottom: 1px dotted #000; }
+    </style>
+</head>
+<body>
+    <table class="header-table">
+        <tr>
+            <td>
+                <div class="bold">REPUBLIQUE DU CAMEROUN</div>
+                <div class="italic">Paix – Travail – Patrie</div>
+                <div>------------------</div>
+                <div class="bold">MINISTERE DE LA JEUNESSE ET DE<br>L'EDUCATION CIVIQUE</div>
+                <div>------------------</div>
+                <div>CABINET DU MINISTRE</div>
+                <div>------------------</div>
+                <div>SERVICE DE LA COMPTABILITE-MATIERES</div>
+            </td>
+            <td>
+                <div class="bold">REPUBLIC OF CAMEROON</div>
+                <div class="italic">Peace – Work – Fatherland</div>
+                <div>------------------</div>
+                <div class="bold">MINISTRY OF YOUTH AFFAIRS AND<br>CIVIC EDUCATION</div>
+                <div>------------------</div>
+            </td>
+        </tr>
+    </table>
+
+    <h1>BON DE SORTIE PROVISOIRE</h1>
+
+    <div class="meta">
+        <div><span class="label bold">Numéro d'ordre :</span> {{ bsp.numero }}</div>
+        <div><span class="label bold">SERVICE DEMANDEUR :</span> {{ service ? service.nom : '……………………………………………………………………' }}</div>
+    </div>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th rowspan="2">N°</th>
+                <th rowspan="2">DÉSIGNATION DES MATIÈRES</th>
+                <th colspan="3">QUANTITE</th>
+                <th rowspan="2">OBSERVATIONS</th>
+            </tr>
+            <tr>
+                <th>Demandée</th>
+                <th>Accordée</th>
+                <th>Servie</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>{{ asset ? (asset.reference ~ ' — ' ~ asset.nom) : '' }}</td>
+                <td>{{ bsp.quantiteDemandee ?? '' }}</td>
+                <td>{{ bsp.quantiteAccordee ?? '' }}</td>
+                <td>{{ bsp.quantiteServie }}</td>
+                <td>{{ bsp.observations ?? '' }}</td>
+            </tr>
+            {% for i in 2..14 %}
+            <tr>
+                <td>{{ i }}</td>
+                <td></td><td></td><td></td><td></td><td></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="signatures">
+        <tr>
+            <td class="bold">Le demandeur,</td>
+            <td class="bold">L'Ordonnateur-Matières,</td>
+            <td class="bold">Le Comptable-Matières,</td>
+        </tr>
+        <tr>
+            <td>A Yaoundé, le {{ dateEtablissement }}</td>
+            <td>A Yaoundé, le......................</td>
+            <td>A Yaoundé, le......................</td>
+        </tr>
+    </table>
+
+    <div class="pour-acquit">
+        <div class="bold">Pour acquit,</div>
+        <div>A Yaoundé, le ………………</div>
+    </div>
+</body>
+</html>

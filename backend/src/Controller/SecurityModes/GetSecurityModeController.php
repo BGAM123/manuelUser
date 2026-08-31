@@ -1,0 +1,89 @@
+<?php
+
+namespace App\Controller\SecurityModes;
+
+use App\Exception\ResourceNotFoundException;
+use App\Service\ApiResponseFactory;
+use App\Service\SecurityModeResponseBuilder;
+use App\Service\SecurityModeService;
+use OpenApi\Attributes as OA;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
+#[Route('/security-modes')]
+#[OA\Tag(name: 'SecurityModes')]
+final class GetSecurityModeController extends AbstractController
+{
+    #[Route('/{id}', name: 'app_security_mode_get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/security-modes/{id}',
+        summary: 'Détail d\'un mode de sécurisation',
+        description: 'Retourne les détails d\'un mode de sécurisation.'
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'integer'),
+        description: 'ID du mode de sécurisation',
+        example: 1
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Mode de sécurisation trouvé',
+        content: new OA\JsonContent(
+            example: [
+                'success' => true,
+                'status' => 200,
+                'message' => 'Mode de sécurisation récupéré avec succès.',
+                'data' => [
+                    'id' => 1,
+                    'nom' => 'Physique',
+                    'description' => 'Sécurisation par barrières physiques',
+                    'createdAt' => '2026-08-12 10:00:00',
+                    'updatedAt' => '2026-08-12 10:00:00',
+                ]
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Mode de sécurisation introuvable',
+        content: new OA\JsonContent(
+            example: [
+                'success' => false,
+                'status' => 404,
+                'message' => 'Le mode de sécurisation demandé n\'existe pas.',
+                'data' => null
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Non authentifié'
+    )]
+    #[OA\Response(
+        response: 500,
+        description: 'Erreur serveur'
+    )]
+    public function __invoke(
+        int $id,
+        SecurityModeService $securityModeService,
+        SecurityModeResponseBuilder $responseBuilder,
+        ApiResponseFactory $apiResponse
+    ): JsonResponse {
+        try {
+            $securityMode = $securityModeService->get($id);
+        } catch (ResourceNotFoundException $e) {
+            return $apiResponse->error($e->getMessage(), Response::HTTP_NOT_FOUND);
+        }
+
+        return $apiResponse->success(
+            $responseBuilder->buildDetail($securityMode),
+            Response::HTTP_OK,
+            'Mode de sécurisation récupéré avec succès.'
+        );
+    }
+}
