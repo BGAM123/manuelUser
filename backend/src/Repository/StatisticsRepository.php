@@ -3295,10 +3295,13 @@ class StatisticsRepository extends ServiceEntityRepository
                 ->setParameter('isDeleteFilter', false);
         }
 
-        // Filtre par exercice (année de dateAcquisition) — remplace l'ancien couple anneeDebut/anneeFin.
+        // Filtre par exercice (année du projet) — filtre sur l'exercice des projets liés au bien
         if (!empty($filters['exercice'])) {
-            $qb->andWhere("SUBSTRING({$alias}.dateAcquisition, 1, 4) = :exerciceFilter")
-                ->setParameter('exerciceFilter', (string) $filters['exercice']);
+            $qb->innerJoin("{$alias}.projects", 'p_exercice')
+                ->andWhere('p_exercice.exercice = :exerciceFilter')
+                ->andWhere('p_exercice.isDelete = :isDeleteFilter')
+                ->setParameter('exerciceFilter', (int) $filters['exercice'])
+                ->setParameter('isDeleteFilter', false);
         }
 
         // Security Data Isolation (Voter / Role mapping) — barrière de sécurité, pas un simple

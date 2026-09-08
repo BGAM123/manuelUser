@@ -18,8 +18,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
-#[Route('/assets')]
-#[OA\Tag(name: 'Assets')]
+// #[Route('/assets')]
+// #[OA\Tag(name: 'Assets')]
 final class UpdateAssetController extends AbstractController
 {
     #[Route('/{id}', name: 'app_asset_update', methods: ['PATCH'])]
@@ -40,6 +40,7 @@ final class UpdateAssetController extends AbstractController
                         new OA\Property(property: 'nom', type: 'string', nullable: true),
                         new OA\Property(property: 'valeur', type: 'number', nullable: true),
                         new OA\Property(property: 'quantiteStock', type: 'integer', nullable: true, example: 100, description: 'Stock disponible (bien de type consomptible uniquement). Décrémenté automatiquement par les sorties BSP.'),
+                        new OA\Property(property: 'unite_mesure', type: 'string', nullable: true, example: 'Unité', description: 'Unité de mesure du bien (ex: Unité, Kg, Litre, etc.)'),
                         new OA\Property(property: 'description', type: 'string', nullable: true),
                         new OA\Property(property: 'latitude', type: 'number', nullable: true),
                         new OA\Property(property: 'longitude', type: 'number', nullable: true),
@@ -55,16 +56,16 @@ final class UpdateAssetController extends AbstractController
                         new OA\Property(property: 'piecesJointesNoms[]', type: 'array', items: new OA\Items(type: 'string'), description: "Noms alignés : piecesJointesNoms[0]=Facture d'achat. Si omis → nom original. CSV Swagger auto-découpé.", example: ["Facture d'achat", 'Bon de livraison']),
                         new OA\Property(property: 'reference', type: 'string', nullable: true, description: 'Si vide/null/"null"/"undefined" → inchangé (update) ou auto (create)'),
                         new OA\Property(property: 'seuil', type: 'number', nullable: true, example: 500000, description: 'Seuil de coût pour les maintenances de ce bien'),
-                        new OA\Property(property: 'user_restitution_id', type: 'integer', nullable: true, example: 8, description: 'Optionnel. ID de l\'utilisateur de restitution par défaut pour ce bien.'),
+                        new OA\Property(property: 'service_restitution_id', type: 'integer', nullable: true, example: 16, description: 'Optionnel. ID du service de restitution par défaut pour ce bien.'),
                     ]
                 )
             ),
             new OA\JsonContent(
-                example: ['nom' => 'Ordinateur HP ProBook', 'etat_bien_id' => 2, 'valeur' => 900000, 'latitude' => 3.8480, 'longitude' => 11.5021, 'description' => '', 'user_restitution_id' => 8]
+                example: ['nom' => 'Ordinateur HP ProBook', 'etat_bien_id' => 2, 'valeur' => 900000, 'latitude' => 3.8480, 'longitude' => 11.5021, 'description' => '', 'service_restitution_id' => 16]
             ),
         ]
     )]
-    #[OA\Response(response: 200, description: 'Success', content: new OA\JsonContent(example: ['success' => true, 'status' => 200, 'message' => 'Bien mis à jour avec succès.', 'data' => ['id' => 1]]))]
+    #[OA\Response(response: 200, description: 'Success', content: new OA\JsonContent(example: ['success' => true, 'status' => 200, 'message' => 'Bien mis à jour avec succès.', 'data' => ['id' => 1, 'unite_mesure' => 'Unité', 'quantiteStock' => 100]]))]
     #[OA\Response(response: 400, description: 'Validation', content: new OA\JsonContent(example: ['success' => false, 'status' => 400, 'message' => 'La validation a échoué.', 'data' => ['valeur' => 'Valeur invalide']]))]
     #[OA\Response(response: 401, description: 'Non authentifié', content: new OA\JsonContent(example: ['success' => false, 'status' => 401, 'message' => 'Authentification requise.', 'data' => null]))]
     #[OA\Response(response: 404, description: 'Introuvable', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le bien demandé est introuvable.', 'data' => null]))]

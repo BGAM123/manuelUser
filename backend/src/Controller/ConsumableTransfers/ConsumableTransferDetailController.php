@@ -3,7 +3,9 @@
 namespace App\Controller\ConsumableTransfers;
 
 use App\Entity\ConsumableTransfer;
+use App\Entity\User;
 use App\Repository\ConsumableTransferRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableTransferResponseBuilder;
 use OpenApi\Attributes as OA;
@@ -11,6 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -59,7 +62,9 @@ final class ConsumableTransferDetailController extends AbstractController
     #[OA\Response(response: 404, description: 'Not Found', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le transfert demandé est introuvable.', 'data' => null]))]
     public function __invoke(
         int $id,
+        #[CurrentUser] User $user,
         ConsumableTransferRepository $consumableTransferRepository,
+        ConsumableAccessChecker $accessChecker,
         ConsumableTransferResponseBuilder $responseBuilder,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
@@ -67,6 +72,8 @@ final class ConsumableTransferDetailController extends AbstractController
         if (!$transfer instanceof ConsumableTransfer) {
             return $apiResponse->error('Le transfert demandé est introuvable.', Response::HTTP_NOT_FOUND);
         }
+
+        $accessChecker->assertCanAccessTransfer($user, $transfer);
 
         return $apiResponse->success(
             $responseBuilder->buildDetail($transfer),

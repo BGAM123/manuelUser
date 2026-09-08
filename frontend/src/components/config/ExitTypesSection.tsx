@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog";
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listExitTypes,
   getExitTypeById,
@@ -288,16 +289,25 @@ export function ExitTypesSection() {
       key: "isActive",
       label: t("common.status"),
       render: (et) => (
-        <label className="flex cursor-pointer items-center gap-2">
-          <Switch
-            checked={et.isActive}
-            onCheckedChange={(v) => toggleActiveMutation.mutate({ id: et.id, isActive: v })}
-            aria-label={et.isActive ? t("status.active") : t("common.inactive")}
-          />
-          <Badge variant={et.isActive ? "default" : "secondary"} className="text-xs">
-            {et.isActive ? t("status.active") : t("common.inactive")}
-          </Badge>
-        </label>
+        <CanAccess
+          permission="creation_type_sortie"
+          fallback={
+            <Badge variant={et.isActive ? "default" : "secondary"} className="text-xs">
+              {et.isActive ? t("status.active") : t("common.inactive")}
+            </Badge>
+          }
+        >
+          <label className="flex cursor-pointer items-center gap-2">
+            <Switch
+              checked={et.isActive}
+              onCheckedChange={(v) => toggleActiveMutation.mutate({ id: et.id, isActive: v })}
+              aria-label={et.isActive ? t("status.active") : t("common.inactive")}
+            />
+            <Badge variant={et.isActive ? "default" : "secondary"} className="text-xs">
+              {et.isActive ? t("status.active") : t("common.inactive")}
+            </Badge>
+          </label>
+        </CanAccess>
       ),
     },
     {
@@ -305,23 +315,25 @@ export function ExitTypesSection() {
       label: t("common.actions"),
       render: (et) => (
         <div className="flex items-center gap-1">
-          {loadingEditId === et.id ? (
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-            </span>
-          ) : (
+          <CanAccess permission="creation_type_sortie">
+            {loadingEditId === et.id ? (
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </span>
+            ) : (
+              <RowIconButton
+                icon={Pencil}
+                label={t("action.edit")}
+                onClick={() => handleEdit(et)}
+              />
+            )}
             <RowIconButton
-              icon={Pencil}
-              label={t("action.edit")}
-              onClick={() => handleEdit(et)}
+              icon={Trash2}
+              label={t("action.delete")}
+              onClick={() => setDeleteTarget(et)}
+              tone="danger"
             />
-          )}
-          <RowIconButton
-            icon={Trash2}
-            label={t("action.delete")}
-            onClick={() => setDeleteTarget(et)}
-            tone="danger"
-          />
+          </CanAccess>
         </div>
       ),
     },
@@ -340,13 +352,15 @@ export function ExitTypesSection() {
             </p>
           </div>
         </div>
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={() => setDialog({ open: true, item: null })}
-        >
-          <Plus className="h-4 w-4" /> {t("exitTypes.create")}
-        </Button>
+        <CanAccess permission="creation_type_sortie">
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={() => setDialog({ open: true, item: null })}
+          >
+            <Plus className="h-4 w-4" /> {t("exitTypes.create")}
+          </Button>
+        </CanAccess>
       </div>
 
       <div className="mb-3 flex items-center gap-2">

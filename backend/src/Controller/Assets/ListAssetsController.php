@@ -38,6 +38,7 @@ final class ListAssetsController extends AbstractController
     #[OA\Parameter(name: 'securise', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens sécurisés (true) ou non sécurisés (false).')]
     #[OA\Parameter(name: 'received', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens recus (true) ou non recu (false).')]
     #[OA\Parameter(name: 'restitue', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens restitués (true) ou non restitués (false).')]
+    #[OA\Parameter(name: 'restituable', in: 'query', schema: new OA\Schema(type: 'boolean'), description: 'Filtrer les biens restituables (true) ou non restituables (false).')]
     #[OA\Response(
         response: 200,
         description: 'Success',
@@ -69,11 +70,15 @@ final class ListAssetsController extends AbstractController
                             'valeur' => 850000,
                             'valeurInitiale' => 850000,
                             'dateAcquisition' => '2026-07-30',
+                            'unite_mesure' => 'Unité',
+                            'quantiteStock' => 100,
+                            'isRestitue' => false,
                             'received' => 'false',
                             'etatBien' => ['id' => 1, 'nom' => 'Fonctionnel'],
                             "securise" => true,  // ✅True si le bien est sécurisé et False sinon
                             'location' => ['id' => 2, 'latitude' => 3.8500, 'longitude' => 11.5050, 'geometry_type' => 'Point', 'geometry' => null],
                             'maintenanceEnCours' => null,
+                            'doitEtreRestitue' => false,
                         ],
                     ],
                 ],
@@ -126,6 +131,11 @@ final class ListAssetsController extends AbstractController
         $securise = $request->query->get('securise');
         $received = $request->query->get('received');
         $restitue = $request->query->get('restitue');
+        $restituable = $request->query->get('restituable');
+        $restituableBool = null;
+        if (null !== $restituable && '' !== trim($restituable)) {
+            $restituableBool = filter_var($restituable, FILTER_VALIDATE_BOOLEAN);
+        }
 
         // Un category_id peut pointer vers une catégorie soft-deletée : on la résout
         // toujours vers une catégorie active (ou la catégorie par défaut) avant de filtrer,
@@ -160,8 +170,8 @@ final class ListAssetsController extends AbstractController
             }
         }
 
-        $items = $assetRepository->findPaginated($page, $limit, $isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue);
-        $total = $assetRepository->countAll($isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue);
+        $items = $assetRepository->findPaginated($page, $limit, $isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue, $restituableBool);
+        $total = $assetRepository->countAll($isDelete, $search, $categoryId, $assetTypeId, $serviceIds, $projectIds, $exercice, $statut, $userId, $securise, $received, $restitue, $restituableBool);
 
         $data = array_map(static fn ($asset) => $responseBuilder->buildListItem($asset), $items);
 

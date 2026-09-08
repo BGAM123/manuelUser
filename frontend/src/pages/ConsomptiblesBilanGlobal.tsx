@@ -11,6 +11,7 @@ import { ArrowLeft, BarChart3, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { ExportButton, type ExportColumn } from "@/components/shared/ExportButton";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   getConsumablesBilanGlobal,
   type ApiConsumableBilanGlobalEntry,
@@ -59,6 +60,15 @@ export default function ConsomptiblesBilanGlobalPage() {
         </div>
 
         {/* Panneau flottant */}
+        <CanAccess
+          permission="consultation_bilan_consomptible"
+          fallback={
+            <div className="w-full rounded-2xl border border-border bg-card p-6 text-center shadow-xl">
+              <p className="text-sm font-semibold text-foreground">{t("common.accessDenied.title")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("common.accessDenied.desc")}</p>
+            </div>
+          }
+        >
         <div className="w-full space-y-4 rounded-2xl border border-border bg-card p-6 shadow-xl">
           <div className="flex items-center justify-between gap-3">
             <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
@@ -131,6 +141,7 @@ export default function ConsomptiblesBilanGlobalPage() {
             </div>
           )}
         </div>
+        </CanAccess>
       </div>
     </AppShell>
   );

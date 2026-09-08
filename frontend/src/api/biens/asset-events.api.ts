@@ -66,10 +66,16 @@ export interface ApiAffectation {
     departement?: { id: number; nom: string };
     arrondissement?: { id: number; nom: string };
   };
-  utilisateur?: { id: number; firstName: string; lastName: string };
+  /**
+   * `utilisateur.service` (service/poste de rattachement de l'utilisateur
+   * affecté) ajouté côté backend le 2026-09-01 — nécessaire pour la colonne
+   * "Destination" du tableau des affectations quand le bien est affecté à
+   * un individu plutôt qu'à un service (voir Biens.tsx).
+   */
+  utilisateur?: { id: number; firstName: string; lastName: string; service?: { id: number; nom: string } | null };
   piecesJointes?: ApiPieceJointe[];
   createdAt?: string;
-  /** Auteur de l'affectation (qui l'a créée) — ajouté côté backend le 2026-08-31, absent du Swagger initial. */
+  /** Auteur de l'affectation (qui l'a créée) — ajouté côté backend le 2026-08-31. */
   createdBy?: { id: number; firstName: string; lastName: string } | null;
   /** Confirmé en direct (2026-08-27) sur GET /assets/{id}/assignments — absent du Swagger fourni initialement. */
   accuseReception?: { effectue: boolean; date: string | null; par: unknown | null; commentaire: string | null } | null;
@@ -217,6 +223,9 @@ export function normalizeAffectation(raw: any): ApiAffectation {
           id: raw.utilisateur.id,
           firstName: raw.utilisateur.firstName ?? raw.utilisateur.prenom ?? "",
           lastName: raw.utilisateur.lastName ?? raw.utilisateur.nom ?? "",
+          service: raw.utilisateur.service
+            ? { id: raw.utilisateur.service.id, nom: raw.utilisateur.service.nom ?? raw.utilisateur.service.name ?? "" }
+            : null,
         }
       : undefined,
     createdBy: raw.createdBy
@@ -510,13 +519,17 @@ export async function deleteAffectation(id: number): Promise<void> {
 }
 
 /**
- * POST /asset-assignments/{id}/acknowledge — accuse réception d'une
- * affectation. Réservé au destinataire, une seule fois par affectation
- * (400 "déjà accusé réception" en cas de second appel).
+ * POST /asset-assignments/acknowledge-batch — accuse réception d'une
+ * affectation. Réservé au destinataire (ou à un administrateur), une seule
+ * fois par affectation. Il n'existe PAS de route unitaire
+ * POST /asset-assignments/{id}/acknowledge côté backend (confirmé en lisant
+ * AcknowledgeAssetAssignmentController.php — seule /acknowledge-batch est
+ * déclarée, d'où le 404 "No route found" avant ce correctif) : on réutilise
+ * donc la route batch avec un seul id.
  */
 export async function acknowledgeAffectation(id: number): Promise<void> {
   const api = await getApi();
-  await api.post(`/asset-assignments/${id}/acknowledge`);
+  await api.post(`/asset-assignments/acknowledge-batch`, { ids: String(id) });
 }
 
 // ── Maintenance ───────────────────────────────────────────────────────────────

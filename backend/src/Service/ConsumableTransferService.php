@@ -18,6 +18,7 @@ use App\Repository\ServiceRepository;
 use App\Repository\BspRepository;
 use App\Repository\UserRepository;
 use App\Repository\PieceJointeRepository;
+use App\Security\ConsumableAccessChecker;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -40,6 +41,7 @@ final class ConsumableTransferService
         private readonly ConsumableStockManager $stockManager,
         private readonly ConsumableTransferStockManager $transferStockManager, // 🔥 NOUVEAU
         private GestionStockConsommableService $gestionStockService, // EXISTANT (à conserver pour BSP)
+        private readonly ConsumableAccessChecker $accessChecker,
     ) {
     }
 
@@ -81,14 +83,7 @@ final class ConsumableTransferService
         $quantite = (string) $payload['quantite'];
         $observations = $payload['observations'] ?? null;
 
-        // Définir serviceSource
-        $serviceSourceId = $serviceDestinationId;
-        if ($currentUser) {
-            $service = $currentUser->getService();
-            if ($service) {
-                $serviceSourceId = $service->getId();
-            }
-        }
+        $serviceSourceId = $this->resolveServiceSourceId($payload, $currentUser, $consumableId);
 
         // Créer le transfert (1 seule ligne, type BSP)
         $transfer = $this->transferStockManager->createTransfer(
@@ -152,19 +147,12 @@ final class ConsumableTransferService
         $quantite = (string) $payload['quantite'];
         $observations = $payload['observations'] ?? null;
 
-        // Définir serviceSource
-        $serviceSourceId = $serviceDestinationId;
-        if ($currentUser) {
-            $service = $currentUser->getService();
-            if ($service) {
-                $serviceSourceId = $service->getId();
-            }
-        }
+        $serviceSourceId = $this->resolveServiceSourceId($payload, $currentUser, $consumableId);
 
         // Vérifier si le service source possède ce consommable
         $stockSource = $this->transferStockManager->getCurrentStock($consumableId, $serviceSourceId);
         if ($stockSource <= 0) {
-            throw new \Exception('Votre service ne possède pas ce consommable');
+            throw new \Exception('Le service source ne possède pas ce consomptible');
         }
 
         // Créer le transfert (1 seule ligne)
@@ -298,6 +286,42 @@ final class ConsumableTransferService
         }
 
         return $transfer;
+    }
+
+    private function resolveServiceSourceId(array $payload, ?User $currentUser, int $consumableId): int
+    {
+        if (!$currentUser) {
+            throw new ValidationFailedException(['authentication' => 'Un utilisateur connecté est obligatoire pour effectuer un transfert.']);
+        }
+
+        $requestedSourceId = $payload['service_source_id'] ?? null;
+        if ($requestedSourceId !== null && $requestedSourceId !== '') {
+            if (!$this->accessChecker->isAdmin($currentUser)) {
+                throw new ValidationFailedException(['service_source_id' => 'Seul un administrateur peut choisir le service source.']);
+            }
+
+            $sourceId = (int) $requestedSourceId;
+            if (!$this->serviceRepository->getServiceById($sourceId)) {
+                throw new ValidationFailedException(['service_source_id' => "Le service avec l'ID {$sourceId} n'existe pas."]);
+            }
+
+            return $sourceId;
+        }
+
+        if ($this->accessChecker->isAdmin($currentUser)) {
+            $consumable = $this->consumableRepository->getActiveById($consumableId);
+            $ownerServiceId = $consumable?->getService()?->getId();
+            if ($ownerServiceId !== null) {
+                return $ownerServiceId;
+            }
+        }
+
+        $serviceId = $currentUser->getService()?->getId();
+        if ($serviceId === null) {
+            throw new ValidationFailedException(['service_source_id' => 'Votre utilisateur doit être rattaché à un service pour effectuer un transfert.']);
+        }
+
+        return $serviceId;
     }
 
     /**

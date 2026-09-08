@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listAssetSubtypes,
   createAssetSubtype,
@@ -176,15 +177,17 @@ export function AssetSubtypesSection() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">{t("config.subtypes")}</h2>
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setSelected(null);
-                setView("form");
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("assetSubtypes.create")}
-            </Button>
+            <CanAccess permission="creation_type_bien">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setSelected(null);
+                  setView("form");
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("assetSubtypes.create")}
+              </Button>
+            </CanAccess>
           </div>
         </div>
 
@@ -216,7 +219,7 @@ export function AssetSubtypesSection() {
           exportTitle="MINEPIA — Sous-types de biens"
           searchKeys={["nom", "description"]}
           rowActions={(s) => (
-            <>
+            <CanAccess permission="creation_type_bien">
               <RowIconButton
                 icon={Pencil}
                 label={t("action.edit")}
@@ -231,7 +234,7 @@ export function AssetSubtypesSection() {
                 tone="danger"
                 onClick={() => setDeleteTarget(s)}
               />
-            </>
+            </CanAccess>
           )}
         />
       </div>

@@ -126,7 +126,7 @@ export function useProjetOptions() {
       { value: "all", label: "Tous les projets / donateurs" },
       ...(res?.data ?? []).map((p) => ({
         value: String(p.id),
-        label: p.nom,
+        label: p.exercice ? `${p.nom} - ${p.exercice}` : p.nom,
         id: p.id,
       })),
     ],

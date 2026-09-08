@@ -18,7 +18,7 @@ import { ExportButton, type ExportColumn } from "@/components/shared/ExportButto
 import { RemoteSearchSelect } from "@/components/shared/RemoteSearchSelect";
 import { YearStepper } from "@/components/shared/YearStepper";
 import { cn } from "@/utils/utils";
-import { formatFCFA } from "@/api/common";
+import { formatFCFA, formatAmount } from "@/api/common";
 import { listCategories } from "@/api/categories/categories.api";
 import {
   getAssetAmortissement, listAmortissementsTable,
@@ -262,14 +262,14 @@ export default function AmortissementsPage() {
                     <td className="px-3 py-2 font-mono">{r.bien.reference}</td>
                     <td className="px-3 py-2">{r.bien.designation}</td>
                     <td className="px-3 py-2">{r.categorie?.nom ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatFCFA(r.valeur_acquisition)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatAmount(r.valeur_acquisition)}</td>
                     <td className="px-3 py-2">{r.date_acquisition || "—"}</td>
-                    <td className="px-3 py-2 text-right">{r.duree_vie != null ? `${r.duree_vie} ans` : "—"}</td>
-                    <td className="px-3 py-2 text-right">{r.taux_amortissement != null ? `${r.taux_amortissement}%` : "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatFCFA(r.amortissement_annuel)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatFCFA(r.amortissement_cumule)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatFCFA(r.vnc)}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{hasRestant ? `${restant} ans` : "—"}</td>
+                    <td className="px-3 py-2 text-right">{r.duree_vie ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">{r.taux_amortissement ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatAmount(r.amortissement_annuel)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatAmount(r.amortissement_cumule)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatAmount(r.vnc)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{hasRestant ? restant : "—"}</td>
                     <td className="px-3 py-2 text-right">
                       <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2" onClick={() => setDetailTargetId(r.bien.id)}>
                         <Eye className="h-3.5 w-3.5" /> Détails

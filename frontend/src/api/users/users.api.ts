@@ -163,6 +163,26 @@ export async function deleteUser(id: number): Promise<ApiResponse<null>> {
 }
 
 /**
+ * POST /users/restore — Restaure un ou plusieurs utilisateurs supprimés
+ * logiquement (isDelete = true). Les utilisateurs inexistants ou non
+ * supprimés sont simplement ignorés (`skipped`).
+ */
+export interface RestoreUsersResult {
+  restored: number[];
+  skipped: number[];
+  skipped_reasons?: Record<string, string>;
+}
+
+export async function restoreUsers(
+  ids: number[],
+): Promise<ApiResponse<RestoreUsersResult>> {
+  const response = await api.post<ApiResponse<RestoreUsersResult>>("/users/restore", {
+    ids,
+  });
+  return response.data;
+}
+
+/**
  * DELETE /users/{id}/force — Suppression physique définitive d'un
  * utilisateur. Action irréversible.
  */
@@ -170,6 +190,7 @@ export async function forceDeleteUser(id: number): Promise<ApiResponse<null>> {
   const response = await api.delete<ApiResponse<null>>(`/users/${id}/force`);
   return response.data;
 }
+
 
 /**
  * PUT /users/{id}/password — Changer le mot de passe (profil perso).

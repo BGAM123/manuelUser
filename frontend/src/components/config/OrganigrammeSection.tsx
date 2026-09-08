@@ -33,6 +33,7 @@ import {
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
 import { cn } from "@/utils/utils";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listServices, createService, updateService, deleteService,
   getOrganigramme, listTypeOrganigrammes, getServiceById,
@@ -199,30 +200,36 @@ function OrgNodeCard({
             className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              title={t("services.addChild")}
-              onClick={() => onAddChild(node.id, node.nom)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded text-primary hover:bg-primary/10"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title={t("services.editTooltip")}
-              onClick={() => onEdit(node.id)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title={t("services.deleteTooltip")}
-              onClick={() => onDelete(node)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            <CanAccess permission="creation_structure">
+              <button
+                type="button"
+                title={t("services.addChild")}
+                onClick={() => onAddChild(node.id, node.nom)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded text-primary hover:bg-primary/10"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </CanAccess>
+            <CanAccess permission="modification_structure">
+              <button
+                type="button"
+                title={t("services.editTooltip")}
+                onClick={() => onEdit(node.id)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </CanAccess>
+            <CanAccess permission="suppression_structure">
+              <button
+                type="button"
+                title={t("services.deleteTooltip")}
+                onClick={() => onDelete(node)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </CanAccess>
           </div>
         </div>
       </div>
@@ -290,9 +297,11 @@ function OrgTreeView({
             <p className="text-xs text-muted-foreground">{t("services.treeSubtitle")}</p>
           </div>
         </div>
-        <Button size="sm" className="gap-2" onClick={onAddRoot}>
-          <Plus className="h-3.5 w-3.5" /> {t("services.create")}
-        </Button>
+        <CanAccess permission="creation_structure">
+          <Button size="sm" className="gap-2" onClick={onAddRoot}>
+            <Plus className="h-3.5 w-3.5" /> {t("services.create")}
+          </Button>
+        </CanAccess>
       </div>
 
       {/* Barre de recherche */}
@@ -315,9 +324,11 @@ function OrgTreeView({
         <div className="flex h-48 flex-col items-center justify-center gap-3 text-muted-foreground">
           <GitBranch className="h-10 w-10 opacity-30" />
           <p className="text-sm">{t("services.emptyTree")}</p>
-          <Button size="sm" variant="outline" onClick={onAddRoot} className="gap-1">
-            <Plus className="h-4 w-4" /> {t("services.createFirst")}
-          </Button>
+          <CanAccess permission="creation_structure">
+            <Button size="sm" variant="outline" onClick={onAddRoot} className="gap-1">
+              <Plus className="h-4 w-4" /> {t("services.createFirst")}
+            </Button>
+          </CanAccess>
         </div>
       ) : displayedRoots.length === 0 ? (
         <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -629,9 +640,11 @@ export function OrganigrammeSection() {
                 <div>
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-lg font-semibold">{t("config.orga")}</h2>
-                    <Button className="gap-2" onClick={() => { setSelected(null); setView("form"); }}>
-                      <Plus className="h-4 w-4" /> {t("services.create")}
-                    </Button>
+                    <CanAccess permission="creation_structure">
+                      <Button className="gap-2" onClick={() => { setSelected(null); setView("form"); }}>
+                        <Plus className="h-4 w-4" /> {t("services.create")}
+                      </Button>
+                    </CanAccess>
                   </div>
                   <DataTable
                     data={services}
@@ -642,8 +655,12 @@ export function OrganigrammeSection() {
                     searchKeys={["nom", "sigle", "code", "type_service"]}
                     rowActions={(s) => (
                       <>
-                        <RowIconButton icon={Pencil} label={t("action.edit")} onClick={() => { setSelected(s); setView("form"); }} />
-                        <RowIconButton icon={Trash2} label={t("action.delete")} tone="danger" onClick={() => setDeleteTarget(s)} />
+                        <CanAccess permission="modification_structure">
+                          <RowIconButton icon={Pencil} label={t("action.edit")} onClick={() => { setSelected(s); setView("form"); }} />
+                        </CanAccess>
+                        <CanAccess permission="suppression_structure">
+                          <RowIconButton icon={Trash2} label={t("action.delete")} tone="danger" onClick={() => setDeleteTarget(s)} />
+                        </CanAccess>
                       </>
                     )}
                   />
@@ -1244,9 +1261,11 @@ function TypeOrganigrammeSection() {
             <h2 className="text-lg font-semibold">{t("nav.group.orga.types")}</h2>
             <p className="text-xs text-muted-foreground">{t("typeOrga.subtitle")}</p>
           </div>
-          <Button className="gap-2" onClick={() => { setSelected(null); setView("form"); }}>
-            <Plus className="h-4 w-4" /> {t("typeOrga.create")}
-          </Button>
+          <CanAccess permission="creation_structure">
+            <Button className="gap-2" onClick={() => { setSelected(null); setView("form"); }}>
+              <Plus className="h-4 w-4" /> {t("typeOrga.create")}
+            </Button>
+          </CanAccess>
         </div>
         <DataTable
           data={types}
@@ -1257,8 +1276,12 @@ function TypeOrganigrammeSection() {
           searchKeys={["nom", "description"]}
           rowActions={(to) => (
             <>
-              <RowIconButton icon={Pencil} label={t("action.edit")} onClick={() => { setSelected(to); setView("form"); }} />
-              <RowIconButton icon={Trash2} label={t("action.delete")} tone="danger" onClick={() => setDeleteTarget(to)} />
+              <CanAccess permission="modification_structure">
+                <RowIconButton icon={Pencil} label={t("action.edit")} onClick={() => { setSelected(to); setView("form"); }} />
+              </CanAccess>
+              <CanAccess permission="suppression_structure">
+                <RowIconButton icon={Trash2} label={t("action.delete")} tone="danger" onClick={() => setDeleteTarget(to)} />
+              </CanAccess>
             </>
           )}
         />

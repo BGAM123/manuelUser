@@ -49,7 +49,13 @@ final class GetAssetAssignmentsController extends AbstractController
                         'utilisateur' => [
                             'id' => 5,
                             'firstName' => 'Claire',
-                            'lastName' => 'MVONDO'
+                            'lastName' => 'MVONDO',
+                            'service' => ['id' => 3, 'nom' => 'Service du Patrimoine']
+                        ],
+                        'createdBy' => [
+                            'id' => 2,
+                            'firstName' => 'Paul',
+                            'lastName' => 'NDONGO'
                         ],
                         'piecesJointes' => [
                             [
@@ -77,7 +83,7 @@ final class GetAssetAssignmentsController extends AbstractController
         }
 
         $assignments = $asset->getAssignments()->filter(fn($a) => !$a->isDelete())->toArray();
-        
+
         // Trier par date de création décroissante (plus récent en premier)
         usort($assignments, fn($a, $b) => $b->getCreatedAt() <=> $a->getCreatedAt());
 

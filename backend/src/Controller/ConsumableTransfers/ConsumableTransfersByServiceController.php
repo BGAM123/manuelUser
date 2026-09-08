@@ -2,7 +2,9 @@
 
 namespace App\Controller\ConsumableTransfers;
 
+use App\Entity\User;
 use App\Repository\ConsumableTransferRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableTransferResponseBuilder;
 use OpenApi\Attributes as OA;
@@ -10,6 +12,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -49,10 +52,14 @@ final class ConsumableTransfersByServiceController extends AbstractController
     )]
     public function __invoke(
         int $serviceId,
+        #[CurrentUser] User $user,
         ConsumableTransferRepository $consumableTransferRepository,
+        ConsumableAccessChecker $accessChecker,
         ConsumableTransferResponseBuilder $responseBuilder,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
+        $accessChecker->assertCanAccessServiceId($user, $serviceId);
+
         $transfers = $consumableTransferRepository->findByService($serviceId);
 
         return $apiResponse->success(

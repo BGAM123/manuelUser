@@ -25,26 +25,50 @@ class RoleRepository extends ServiceEntityRepository
      */
     public function findPaginatedRoles(int $page, int $limit, ?string $q = null, ?bool $isActive = null, ?string $isDelete = 'false'): array
     {
-        $qb = $this->createQueryBuilder('r')
-            ->leftJoin('r.permissions', 'p')
-            ->addSelect('p');
-        SoftDeleteQueryFilter::apply($qb, 'r', $isDelete);
+        // Étape 1 — pagine uniquement les ids, SANS le LEFT JOIN vers
+        // permissions : combiner un LEFT JOIN vers une relation *-to-many
+        // avec setFirstResult/setMaxResults pagine les LIGNES SQL jointes,
+        // pas les entités racines. Dès qu'un rôle a plusieurs permissions
+        // affectées, il produit plusieurs lignes et la pagination coupe au
+        // milieu des rôles (confirmé en direct : avec des rôles ayant
+        // jusqu'à 61 permissions, limit=200 ne retournait plus que 10 rôles
+        // sur 16, la coupure tombant au milieu d'un rôle).
+        $idQb = $this->createQueryBuilder('r')->select('r.id');
+        SoftDeleteQueryFilter::apply($idQb, 'r', $isDelete);
 
         if (null !== $q && '' !== trim($q)) {
-            $qb->andWhere('r.nom LIKE :q OR r.description LIKE :q')
+            $idQb->andWhere('r.nom LIKE :q OR r.description LIKE :q')
                 ->setParameter('q', '%' . $q . '%');
         }
 
         if (null !== $isActive) {
-            $qb->andWhere('r.isActive = :isActive')
+            $idQb->andWhere('r.isActive = :isActive')
                 ->setParameter('isActive', $isActive);
         }
 
+        $ids = array_column(
+            $idQb->orderBy('r.nom', 'ASC')
+                ->setFirstResult(($page - 1) * $limit)
+                ->setMaxResults($limit)
+                ->getQuery()
+                ->getScalarResult(),
+            'id',
+        );
+
+        if ([] === $ids) {
+            return [];
+        }
+
+        // Étape 2 — recharge ces rôles précis avec leurs permissions : le
+        // LEFT JOIN n'enrichit plus que les lignes déjà sélectionnées par
+        // id, il ne pagine plus rien.
         /** @var array<int, Role> $result */
-        $result = $qb
+        $result = $this->createQueryBuilder('r')
+            ->leftJoin('r.permissions', 'p')
+            ->addSelect('p')
+            ->andWhere('r.id IN (:ids)')
+            ->setParameter('ids', $ids)
             ->orderBy('r.nom', 'ASC')
-            ->setFirstResult(($page - 1) * $limit)
-            ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
 

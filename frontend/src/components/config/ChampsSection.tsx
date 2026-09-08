@@ -54,6 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { SearchableMultiSelect, type MultiSelectOption } from "@/components/shared/SearchableMultiSelect";
 import { useT, type Key } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listChamps,
   getChampById,
@@ -249,22 +250,24 @@ export function ChampsSection() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">{t("config.champs")}</h2>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => { setAffectOpen(true); setAffectChampIds([]); }}
-            >
-              <Tags className="h-4 w-4" /> {t("champs.assignButton")}
-            </Button>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setSelected(null);
-                setView("form");
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("champs.create")}
-            </Button>
+            <CanAccess permission="creation_champ_personnalise">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => { setAffectOpen(true); setAffectChampIds([]); }}
+              >
+                <Tags className="h-4 w-4" /> {t("champs.assignButton")}
+              </Button>
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setSelected(null);
+                  setView("form");
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("champs.create")}
+              </Button>
+            </CanAccess>
           </div>
         </div>
 
@@ -293,13 +296,15 @@ export function ChampsSection() {
           searchKeys={["nom"]}
           rowActions={(c) =>
             c.is_delete ? (
-              <RowIconButton
-                icon={RotateCcw}
-                label={t("action.restore")}
-                onClick={() => restoreMutation.mutate(c.id)}
-              />
+              <CanAccess permission="creation_champ_personnalise">
+                <RowIconButton
+                  icon={RotateCcw}
+                  label={t("action.restore")}
+                  onClick={() => restoreMutation.mutate(c.id)}
+                />
+              </CanAccess>
             ) : (
-              <>
+              <CanAccess permission="creation_champ_personnalise">
                 <RowIconButton
                   icon={loadingEditId === c.id ? Loader2 : Pencil}
                   label={t("action.edit")}
@@ -323,7 +328,7 @@ export function ChampsSection() {
                   tone="danger"
                   onClick={() => setDeleteTarget(c)}
                 />
-              </>
+              </CanAccess>
             )
           }
         />

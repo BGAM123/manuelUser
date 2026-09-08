@@ -211,13 +211,22 @@ class AssetRepository extends ServiceEntityRepository
         ?string $securise = null,
         ?string $received = null,
         ?string $restitue = null,
+        ?bool $restituable = null,
     ): array {
+        // Étape 1 — pagine uniquement les ids DISTINCTS des biens correspondant
+        // aux filtres. Les LEFT JOIN vers des relations *-à-plusieurs
+        // (assignments, assetSecurities...) combinés à setFirstResult/
+        // setMaxResults pagineraient sinon les LIGNES SQL jointes et non les
+        // biens distincts — un bien avec plusieurs affectations ou plusieurs
+        // sécurisations produit plusieurs lignes, et la pagination coupe au
+        // milieu des biens (même bug que RoleRepository::findPaginatedRoles,
+        // confirmé en direct : limit=10 ne retournait que 4 biens sur 10).
         $qb = $this->createQueryBuilder('a')
-            ->leftJoin('a.categories', 'c')->addSelect('c')
-            ->leftJoin('a.assetTypes', 't')->addSelect('t')
-            ->leftJoin('a.etatBiens', 'e')->addSelect('e')
-            ->leftJoin('a.services', 's')->addSelect('s')
-            ->leftJoin('a.projects', 'p')->addSelect('p')
+            ->select('a.id')
+            ->distinct()
+            ->leftJoin('a.categories', 'c')
+            ->leftJoin('a.assetTypes', 't')
+            ->leftJoin('a.projects', 'p')
             ->leftJoin('a.assignments', 'ass')
             ->leftJoin('ass.service', 'assService')
             ->leftJoin('ass.user', 'u')
@@ -313,6 +322,17 @@ class AssetRepository extends ServiceEntityRepository
             }
         }
 
+        // ✅ Filtre par restituable (via serviceRestitution)
+        if (null !== $restituable) {
+            if ($restituable) {
+                // Biens restituables : ont un serviceRestitution renseigné
+                $qb->andWhere('a.serviceRestitution IS NOT NULL');
+            } else {
+                // Biens non restituables : n'ont pas de serviceRestitution
+                $qb->andWhere('a.serviceRestitution IS NULL');
+            }
+        }
+
         if (null !== $statut) {
             $qb->andWhere('a.statut = :statut')->setParameter('statut', $statut);
         } else {
@@ -320,7 +340,28 @@ class AssetRepository extends ServiceEntityRepository
             $qb->andWhere('a.statut != :statutDefault')->setParameter('statutDefault', 'SORTIE');
         }
 
-        return $qb->getQuery()->getResult();
+        $ids = array_column($qb->getQuery()->getScalarResult(), 'id');
+        if ([] === $ids) {
+            return [];
+        }
+
+        // Étape 2 — recharge ces biens précis avec toutes leurs relations
+        // pour l'affichage : le LEFT JOIN n'enrichit plus que les lignes déjà
+        // sélectionnées par id, il ne pagine plus rien.
+        /** @var array<int, Asset> $result */
+        $result = $this->createQueryBuilder('a')
+            ->leftJoin('a.categories', 'c')->addSelect('c')
+            ->leftJoin('a.assetTypes', 't')->addSelect('t')
+            ->leftJoin('a.etatBiens', 'e')->addSelect('e')
+            ->leftJoin('a.services', 's')->addSelect('s')
+            ->leftJoin('a.projects', 'p')->addSelect('p')
+            ->andWhere('a.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->orderBy('a.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        return $result;
     }
 
 public function countAll(
@@ -336,6 +377,7 @@ public function countAll(
     ?string $securise = null,
     ?string $received = null,
     ?string $restitue = null,
+    ?bool $restituable = null,
 ): int {
     $qb = $this->createQueryBuilder('a')
         ->select('COUNT(DISTINCT a.id)')
@@ -443,6 +485,17 @@ public function countAll(
             // Biens non restitués : n'ont pas d'affectation de type RESTITUTION active
             $qb->andWhere('(ass.typeAffectation != :typeRestitution OR ass.typeAffectation IS NULL OR ass.detenteur = false OR ass.dateFin IS NOT NULL)')
                 ->setParameter('typeRestitution', 'RESTITUTION');
+        }
+    }
+
+    // ✅ Filtre par restituable (via serviceRestitution)
+    if (null !== $restituable) {
+        if ($restituable) {
+            // Biens restituables : ont un serviceRestitution renseigné
+            $qb->andWhere('a.serviceRestitution IS NOT NULL');
+        } else {
+            // Biens non restituables : n'ont pas de serviceRestitution
+            $qb->andWhere('a.serviceRestitution IS NULL');
         }
     }
 

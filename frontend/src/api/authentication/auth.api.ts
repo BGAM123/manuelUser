@@ -7,6 +7,7 @@
 import axios from "axios";
 import type { ApiResponse } from "@/api/types";
 import { TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY } from "@/api/axios";
+import { emitAuthChanged } from "@/utils/authEvents";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -58,19 +59,40 @@ export interface AuthUser {
 export async function loginApi(payload: LoginPayload): Promise<LoginResult> {
   const baseURL = import.meta.env.VITE_API_URL as string;
 
-  const response = await axios.post<ApiResponse<{ token?: string; refresh_token?: string | null; requires_otp?: boolean }>>(
-    `${baseURL}/login_check`,
-    payload,
-    { headers: { "Content-Type": "application/json" } },
-  );
+  const response = await axios.post<
+    ApiResponse<{ token?: string; refresh_token?: string | null; requires_otp?: boolean }> & {
+      token?: string;
+      refresh_token?: string | null;
+      requires_otp?: boolean;
+    }
+  >(`${baseURL}/login_check`, payload, {
+    headers: { "Content-Type": "application/json" },
+  });
 
-  const data = response.data.data;
+  const body = response.data as unknown;
+
+  // L'aperçu Lovable peut renvoyer une page HTML (chaîne) au lieu du JSON de
+  // l'API lorsque le relais ne joint pas le serveur : on le détecte pour
+  // afficher un message clair au lieu d'un plantage « requires_otp ».
+  if (typeof body !== "object" || body === null) {
+    throw new Error("INVALID_API_RESPONSE");
+  }
+
+  const envelope = body as {
+    data?: { token?: string; refresh_token?: string | null; requires_otp?: boolean } | null;
+    token?: string;
+    refresh_token?: string | null;
+    requires_otp?: boolean;
+  };
+  // Certains déploiements renvoient les champs à la racine, d'autres sous "data".
+  const data = envelope.data ?? envelope;
 
   if (data.requires_otp) {
     return { requiresOtp: true, email: payload.email };
   }
 
-  const token = data.token!;
+  const token = data.token;
+  if (!token) throw new Error("INVALID_API_RESPONSE");
   const refresh_token = data.refresh_token ?? null;
   localStorage.setItem(TOKEN_KEY, token);
   if (refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
@@ -105,4 +127,5 @@ export function logoutApi(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  emitAuthChanged();
 }

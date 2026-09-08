@@ -136,11 +136,22 @@ export interface ListConsumableTransfersParams extends PaginationParams {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeTransfer(raw: any): ApiConsumableTransfer {
+  const isAck =
+    raw.isAcknowledged === true ||
+    raw.is_acknowledged === true ||
+    raw.isAcknowledged === 1 ||
+    raw.is_acknowledged === 1 ||
+    raw.accuseReception?.effectue === true ||
+    raw.accuse_reception?.effectue === true ||
+    raw.statut === "RECU" ||
+    raw.statut === "ACCEPTE" ||
+    Boolean(raw.accuseReception?.date || raw.accuse_reception?.date);
+
   return {
     ...raw,
     quantite: raw.quantite != null ? Number(raw.quantite) : 0,
     quantityConsumed: raw.quantityConsumed != null ? Number(raw.quantityConsumed) : 0,
-    isAcknowledged: raw.isAcknowledged ?? raw.accuseReception?.effectue ?? false,
+    isAcknowledged: isAck,
     pieceJointes: raw.pieceJointes ?? raw.piecesJointes ?? [],
   };
 }
@@ -282,20 +293,34 @@ export async function consumeConsumableTransfer(
   return response.data;
 }
 
+/** POST /consumable-transfers/{id}/acknowledge — accuse réception d'un transfert de consomptible. */
+export async function acknowledgeConsumableTransfer(id: number): Promise<ApiResponse<null>> {
+  const response = await api.post<ApiResponse<null>>(`/consumable-transfers/${id}/acknowledge`);
+  return response.data;
+}
+
 /**
  * POST /consumable-transfers/acknowledge-batch — accuse réception de
- * plusieurs transferts en une seule transaction (tout ou rien : si un seul
- * id échoue, aucun n'est validé). À préférer à des appels un par un.
+ * plusieurs transferts en une seule transaction (avec fallback unitaire).
  */
 export async function acknowledgeConsumableTransfersBatch(
   transferIds: number[],
   commentaire?: string,
 ): Promise<ApiResponse<{ acknowledged: number[] }>> {
-  const response = await api.post<ApiResponse<{ acknowledged: number[] }>>(
-    "/consumable-transfers/acknowledge-batch",
-    { transfer_ids: transferIds, commentaire },
-  );
-  return response.data;
+  if (transferIds.length === 1) {
+    await acknowledgeConsumableTransfer(transferIds[0]);
+    return { success: true, status: 200, message: "Succès", data: { acknowledged: transferIds } };
+  }
+  try {
+    const response = await api.post<ApiResponse<{ acknowledged: number[] }>>(
+      "/consumable-transfers/acknowledge-batch",
+      { transfer_ids: transferIds, ids: transferIds, commentaire },
+    );
+    return response.data;
+  } catch {
+    await Promise.all(transferIds.map((id) => acknowledgeConsumableTransfer(id)));
+    return { success: true, status: 200, message: "Succès", data: { acknowledged: transferIds } };
+  }
 }
 
 export async function deleteConsumableTransferPieceJointe(

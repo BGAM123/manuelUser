@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listRoles,
   createRoles,
@@ -153,9 +154,27 @@ export function RolesSection() {
               </Badge>
             ))}
             {count > 3 && (
-              <Badge variant="outline" className="text-xs">
-                +{count - 3}
-              </Badge>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" onClick={(e) => e.stopPropagation()}>
+                    <Badge variant="outline" className="cursor-pointer text-xs hover:bg-muted">
+                      +{count - 3}
+                    </Badge>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 max-h-72 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  <p className="mb-2 text-xs font-semibold text-foreground">
+                    {t("roles.allPermissions", { count })}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {r.permissions!.map((p) => (
+                      <Badge key={p.id} variant="secondary" className="font-mono text-xs">
+                        {p.nom}
+                      </Badge>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
           </div>
         );
@@ -234,15 +253,17 @@ export function RolesSection() {
               <Switch checked={showDeleted} onCheckedChange={setShowDeleted} />
               {t("common.showDeleted")}
             </label>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setSelected(null);
-                setView("form");
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("roles.create")}
-            </Button>
+            <CanAccess permission="creation_role">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setSelected(null);
+                  setView("form");
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("roles.create")}
+              </Button>
+            </CanAccess>
           </div>
         </div>
         <DataTable
@@ -256,36 +277,44 @@ export function RolesSection() {
             <>
               {!showDeleted && (
                 <>
-                  <RowIconButton
-                    icon={Pencil}
-                    label={t("action.edit")}
-                    onClick={() => {
-                      setSelected(r);
-                      setView("form");
-                    }}
-                  />
-                  <RowIconButton
-                    icon={ShieldCheck}
-                    label={t("roles.permissions.manage")}
-                    onClick={() => {
-                      setSelected(r);
-                      setView("permissions");
-                    }}
-                  />
+                  <CanAccess permission="creation_role">
+                    <RowIconButton
+                      icon={Pencil}
+                      label={t("action.edit")}
+                      onClick={() => {
+                        setSelected(r);
+                        setView("form");
+                      }}
+                    />
+                  </CanAccess>
+                  <CanAccess permission="affectation_permission_role">
+                    <RowIconButton
+                      icon={ShieldCheck}
+                      label={t("roles.permissions.manage")}
+                      onClick={() => {
+                        setSelected(r);
+                        setView("permissions");
+                      }}
+                    />
+                  </CanAccess>
                 </>
               )}
-              {showDeleted ? (
-                <RowIconButton icon={RotateCcw} label={t("action.restore")} onClick={() => setRestoreTarget(r)} />
-              ) : (
-                <RowIconButton icon={Archive} label={t("action.delete")} onClick={() => setArchiveTarget(r)} />
-              )}
+              <CanAccess permission="creation_role">
+                {showDeleted ? (
+                  <RowIconButton icon={RotateCcw} label={t("action.restore")} onClick={() => setRestoreTarget(r)} />
+                ) : (
+                  <RowIconButton icon={Archive} label={t("action.delete")} onClick={() => setArchiveTarget(r)} />
+                )}
+              </CanAccess>
               {showDeleted && (
-                <RowIconButton
-                  icon={Trash2}
-                  label={t("common.permanentDelete")}
-                  tone="danger"
-                  onClick={() => setDeleteTarget(r)}
-                />
+                <CanAccess permission="creation_role">
+                  <RowIconButton
+                    icon={Trash2}
+                    label={t("common.permanentDelete")}
+                    tone="danger"
+                    onClick={() => setDeleteTarget(r)}
+                  />
+                </CanAccess>
               )}
             </>
           )}

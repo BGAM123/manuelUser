@@ -2,8 +2,10 @@
 
 namespace App\Controller\Consumables;
 
+use App\Entity\User;
 use App\Repository\ConsumableRepository;
 use App\Repository\ConsumableTransferRepository; // 🔥 NOUVEAU
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -11,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -65,13 +68,14 @@ final class ListConsumablesController extends AbstractController
                             'nom' => 'Papier A4',
                             'description' => 'Papier format A4 80g/m²',
                             'quantite' => '5000.00',
+                            'unite_mesure' => 'Paquet',
                             'stockActuel' => '4500.00', // 🔥 NOUVEAU CHAMP
                             'category' => ['id' => 2, 'nom' => 'Fournitures de bureau'],
                             'assetType' => null,
                             'assetSubType' => null,
                             'prixInitial' => '10.00',
                             'prixTotal' => '50000.00',
-                            'service' => ['id' => 16, 'nom' => 'Direction des Systèmes d\'Information'], 
+                            'service' => ['id' => 16, 'nom' => 'Direction des Systèmes d\'Information'],
                             'createdAt' => '2026-08-16 10:00:00',
                             'updatedAt' => '2026-08-16 10:00:00',
                         ],
@@ -82,8 +86,10 @@ final class ListConsumablesController extends AbstractController
     )]
     public function __invoke(
         Request $request,
+        #[CurrentUser] User $user,
         ConsumableRepository $consumableRepository,
         ConsumableTransferRepository $transferRepository, // 🔥 NOUVEAU
+        ConsumableAccessChecker $accessChecker,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
         $page = max(1, $request->query->getInt('page', 1));
@@ -100,21 +106,12 @@ final class ListConsumablesController extends AbstractController
             $categoryIds = array_map('intval', explode(',', $categoryIdsParam));
         }
 
+        // Un utilisateur normal ne voit que les consomptibles de son propre service ; seul
+        // un administrateur peut demander all_services=true pour tout voir. `?? -1` évite
+        // qu'un utilisateur sans service rattaché ne tombe sur "aucun filtre" (fuite).
         $allServicesRequested = filter_var($request->query->get('all_services', false), FILTER_VALIDATE_BOOLEAN);
-        $user = $this->getUser();
-        if ($user && method_exists($user, 'getId')) {
-            $isAdmin = false;
-            $adminRoleNames = ['Administrateur', 'Administrateur patrimonial', 'Administrateur système'];
-            foreach ($user->getAssignedRoles() as $role) {
-                if (in_array($role->getNom(), $adminRoleNames, true)) {
-                    $isAdmin = true;
-                    break;
-                }
-            }
-
-            if (!$allServicesRequested || !$isAdmin) {
-                $serviceId = $user->getService()?->getId();
-            }
+        if (!$allServicesRequested || !$accessChecker->isAdmin($user)) {
+            $serviceId = $user->getService()?->getId() ?? -1;
         }
 
         $items = $consumableRepository->findPaginated($page, $limit, $search, $serviceId, $isDelete, $categoryIds);
@@ -151,6 +148,7 @@ final class ListConsumablesController extends AbstractController
             'nom' => $consumable->getNom(),
             'description' => $consumable->getDescription(),
             'quantite' => $consumable->getQuantite(),
+            'unite_mesure' => $consumable->getUnite_mesure(),
             'stockActuel' => (string) $stockActuel, // 🔥 NOUVEAU CHAMP
             'prixInitial' => $consumable->getPrixInitial(),
             'prixTotal' => $consumable->getPrixTotal(),

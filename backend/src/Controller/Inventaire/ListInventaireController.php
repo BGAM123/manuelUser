@@ -167,7 +167,7 @@ final class ListInventaireController extends AbstractController
             $statut = $request->query->get('statut');
             if ($statut !== null && $statut !== '') {
                 // Valider le statut (optionnel)
-                $validStatuts = ['ACTIF', 'SORTIE'];
+                $validStatuts = ['ACTIF', 'SORTIS'];
                 if (!in_array(strtoupper($statut), $validStatuts)) {
                     return $apiResponse->error(
                         'Statut invalide. Les valeurs possibles sont: ' . implode(', ', $validStatuts),

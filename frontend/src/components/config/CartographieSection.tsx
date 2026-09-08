@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useT } from "@/utils/i18n";
 import { cn } from "@/utils/utils";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   getCartographie, createRegion, updateRegion, softDeleteRegion,
   type CartographieRegion,
@@ -95,20 +96,22 @@ function ArondNode({
       <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
       <span className="flex-1 truncate text-sm text-foreground">{arond.nom}</span>
       <div className="flex shrink-0 items-center gap-0.5">
-        <ActionBtn
-          icon={Pencil}
-          label={t("cartographie.editArond")}
-          tone="primary"
-          onClick={() =>
-            onDialog({ type: "edit-arond", id: arond.id, nom: arond.nom, code: arond.code ?? "" })
-          }
-        />
-        <ActionBtn
-          icon={Trash2}
-          label={t("cartographie.deleteArond")}
-          tone="danger"
-          onClick={() => onDialog({ type: "delete-arond", id: arond.id, nom: arond.nom })}
-        />
+        <CanAccess permission="creation_cartographie">
+          <ActionBtn
+            icon={Pencil}
+            label={t("cartographie.editArond")}
+            tone="primary"
+            onClick={() =>
+              onDialog({ type: "edit-arond", id: arond.id, nom: arond.nom, code: arond.code ?? "" })
+            }
+          />
+          <ActionBtn
+            icon={Trash2}
+            label={t("cartographie.deleteArond")}
+            tone="danger"
+            onClick={() => onDialog({ type: "delete-arond", id: arond.id, nom: arond.nom })}
+          />
+        </CanAccess>
       </div>
     </div>
   );
@@ -146,28 +149,30 @@ function DeptNode({
           {t("cartographie.arondCount", { count: dept.arrondissements.length })}
         </span>
         <div className="flex shrink-0 items-center gap-0.5">
-          <ActionBtn
-            icon={Plus}
-            label={t("cartographie.addArond")}
-            tone="primary"
-            onClick={() =>
-              onDialog({ type: "create-arond", deptId: dept.id, deptNom: dept.nom })
-            }
-          />
-          <ActionBtn
-            icon={Pencil}
-            label={t("cartographie.editDept")}
-            tone="primary"
-            onClick={() =>
-              onDialog({ type: "edit-dept", id: dept.id, nom: dept.nom, code: dept.code ?? "" })
-            }
-          />
-          <ActionBtn
-            icon={Trash2}
-            label={t("cartographie.deleteDept")}
-            tone="danger"
-            onClick={() => onDialog({ type: "delete-dept", id: dept.id, nom: dept.nom })}
-          />
+          <CanAccess permission="creation_cartographie">
+            <ActionBtn
+              icon={Plus}
+              label={t("cartographie.addArond")}
+              tone="primary"
+              onClick={() =>
+                onDialog({ type: "create-arond", deptId: dept.id, deptNom: dept.nom })
+              }
+            />
+            <ActionBtn
+              icon={Pencil}
+              label={t("cartographie.editDept")}
+              tone="primary"
+              onClick={() =>
+                onDialog({ type: "edit-dept", id: dept.id, nom: dept.nom, code: dept.code ?? "" })
+              }
+            />
+            <ActionBtn
+              icon={Trash2}
+              label={t("cartographie.deleteDept")}
+              tone="danger"
+              onClick={() => onDialog({ type: "delete-dept", id: dept.id, nom: dept.nom })}
+            />
+          </CanAccess>
         </div>
       </div>
 
@@ -230,28 +235,30 @@ function RegionNode({
           {t("cartographie.deptCount", { count: region.departements.length })}
         </span>
         <div className="flex shrink-0 items-center gap-0.5">
-          <ActionBtn
-            icon={Plus}
-            label={t("cartographie.addDept")}
-            tone="primary"
-            onClick={() =>
-              onDialog({ type: "create-dept", regionId: region.id, regionNom: region.nom })
-            }
-          />
-          <ActionBtn
-            icon={Pencil}
-            label={t("cartographie.editRegion")}
-            tone="primary"
-            onClick={() =>
-              onDialog({ type: "edit-region", id: region.id, nom: region.nom, code: region.code ?? "" })
-            }
-          />
-          <ActionBtn
-            icon={Trash2}
-            label={t("cartographie.deleteRegion")}
-            tone="danger"
-            onClick={() => onDialog({ type: "delete-region", id: region.id, nom: region.nom })}
-          />
+          <CanAccess permission="creation_cartographie">
+            <ActionBtn
+              icon={Plus}
+              label={t("cartographie.addDept")}
+              tone="primary"
+              onClick={() =>
+                onDialog({ type: "create-dept", regionId: region.id, regionNom: region.nom })
+              }
+            />
+            <ActionBtn
+              icon={Pencil}
+              label={t("cartographie.editRegion")}
+              tone="primary"
+              onClick={() =>
+                onDialog({ type: "edit-region", id: region.id, nom: region.nom, code: region.code ?? "" })
+              }
+            />
+            <ActionBtn
+              icon={Trash2}
+              label={t("cartographie.deleteRegion")}
+              tone="danger"
+              onClick={() => onDialog({ type: "delete-region", id: region.id, nom: region.nom })}
+            />
+          </CanAccess>
         </div>
       </div>
 
@@ -479,13 +486,15 @@ export function CartographieSection() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">({regions.length}/{MAX_REGIONS})</span>
-          <Button
-            className="gap-2"
-            disabled={atRegionLimit}
-            onClick={() => setDialog({ type: "create-region" })}
-          >
-            <Plus className="h-4 w-4" /> {t("cartographie.newRegion")}
-          </Button>
+          <CanAccess permission="creation_cartographie">
+            <Button
+              className="gap-2"
+              disabled={atRegionLimit}
+              onClick={() => setDialog({ type: "create-region" })}
+            >
+              <Plus className="h-4 w-4" /> {t("cartographie.newRegion")}
+            </Button>
+          </CanAccess>
         </div>
       </div>
 

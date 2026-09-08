@@ -49,7 +49,15 @@ final class AssetAssignmentResponseBuilder
                 'nom' => $assignedUser->getLastName(),
                 'prenom' => $assignedUser->getFirstName(),
                 'matricule' => $assignedUser->getMatricule(),
-                'email' => $assignedUser->getEmail()
+                'email' => $assignedUser->getEmail(),
+                // Service/poste de rattachement de l'utilisateur affecté —
+                // nécessaire pour la colonne "Destination" du tableau des
+                // affectations quand le bien est affecté à un individu plutôt
+                // qu'à un service (ajout 2026-09-01).
+                'service' => $assignedUser->getService() ? [
+                    'id' => $assignedUser->getService()->getId(),
+                    'nom' => $assignedUser->getService()->getNom(),
+                ] : null,
             ];
         }
 

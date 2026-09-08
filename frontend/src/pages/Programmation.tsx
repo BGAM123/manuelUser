@@ -7,7 +7,7 @@ import { DataTable, RowIconButton, type Column } from "@/components/shared/DataT
 import { StatusBadge, statutTone } from "@/components/shared/StatusBadge";
 import { useViewStack } from "@/hooks/useViewStack";
 import { useT } from "@/utils/i18n";
-import { mockProgrammations, formatFCFA, type Programmation } from "@/utils/mock-data";
+import { mockProgrammations, formatFCFA, formatAmount, type Programmation } from "@/utils/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,7 @@ function ProgrammationShell() {
     { key: "exercice", label: "Exercice" },
     { key: "unite", label: "Unité", className: "text-xs" },
     { key: "maturation", label: "Maturation", render: (r) => <StatusBadge tone={r.maturation === "Engagé" ? "normal" : r.maturation === "Prêt à engager" ? "info" : "low"}>{r.maturation}</StatusBadge> },
-    { key: "montantEnvisage", label: "Montant", className: "text-right", render: (r) => <span className="tabular-nums">{formatFCFA(r.montantEnvisage)}</span>, exportFormat: (r) => r.montantEnvisage },
+    { key: "montantEnvisage", label: "Montant (FCFA)", className: "text-right", render: (r) => <span className="tabular-nums">{formatAmount(r.montantEnvisage)}</span>, exportFormat: (r) => r.montantEnvisage },
     { key: "statut", label: "Statut", render: (r) => <StatusBadge tone={statutTone(r.statut)}>{r.statut}</StatusBadge> },
   ];
 

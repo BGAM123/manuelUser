@@ -3,7 +3,9 @@
 namespace App\Controller\Consumables;
 
 use App\Entity\Consumable;
+use App\Entity\User;
 use App\Exception\ResourceInUseException;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ForceDeleteService;
 use OpenApi\Attributes as OA;
@@ -11,6 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -28,9 +31,13 @@ final class ForceDeleteConsumableController extends AbstractController
     #[OA\Response(response: 404, description: 'Not Found', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le consomptible demandé est introuvable.', 'data' => null]))]
     public function __invoke(
         Consumable $consumable,
+        #[CurrentUser] User $user,
         ForceDeleteService $forceDeleteService,
+        ConsumableAccessChecker $accessChecker,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
+        $accessChecker->assertCanAccessConsumable($user, $consumable);
+
         try {
             $forceDeleteService->delete($consumable);
         } catch (ResourceInUseException $e) {

@@ -3,7 +3,9 @@
 namespace App\Controller\ConsumableTransfers;
 
 use App\Entity\ConsumableTransfer;
+use App\Entity\User;
 use App\Repository\ConsumableTransferRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableStockManager;
 use App\Service\ConsumableTransferResponseBuilder;
@@ -14,6 +16,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -41,11 +44,14 @@ final class ConsumeConsumableTransferController extends AbstractController
         content: new OA\JsonContent(example: ['success' => true, 'status' => 200, 'message' => 'Quantité consommée enregistrée avec succès.', 'data' => ['id' => 1, 'quantite' => '500.00', 'quantityConsumed' => '120.00']])
     )]
     #[OA\Response(response: 400, description: 'Bad Request - quantité invalide ou supérieure à la quantité reçue', content: new OA\JsonContent(example: ['success' => false, 'status' => 400, 'message' => 'La quantité consommée ne peut pas dépasser la quantité reçue (500.00).', 'data' => ['quantityConsumed' => 'La quantité consommée ne peut pas dépasser la quantité reçue (500.00).']]))]
+    #[OA\Response(response: 403, description: "Forbidden - seul le service destinataire du transfert peut renseigner la quantité consommée (aucune dérogation, même admin)")]
     #[OA\Response(response: 404, description: 'Not Found', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le transfert demandé est introuvable.', 'data' => null]))]
     public function __invoke(
         int $id,
         Request $request,
+        #[CurrentUser] User $user,
         ConsumableTransferRepository $consumableTransferRepository,
+        ConsumableAccessChecker $accessChecker,
         ConsumableStockManager $stockManager,
         ConsumableTransferStockManager $transferStockManager,
         ConsumableTransferResponseBuilder $responseBuilder,
@@ -55,6 +61,10 @@ final class ConsumeConsumableTransferController extends AbstractController
         if (!$transfer instanceof ConsumableTransfer) {
             return $apiResponse->error('Le transfert demandé est introuvable.', Response::HTTP_NOT_FOUND);
         }
+
+        // Restriction sans dérogation admin : chaque service remplit sa propre
+        // consommation, même un compte administrateur ne peut pas le faire à sa place.
+        $accessChecker->assertCanConsume($user, $transfer);
 
         $payload = json_decode($request->getContent(), true);
         if (!is_array($payload) || !array_key_exists('quantityConsumed', $payload) || !is_numeric($payload['quantityConsumed'])) {

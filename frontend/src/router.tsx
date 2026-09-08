@@ -2,22 +2,31 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter, useRouteError } from "react-router-dom";
 import RootLayout from "@/layouts/RootLayout";
 import { RequireAuth } from "@/components/auth/RequireAuth";
+import { routeImporters } from "@/utils/routePrefetch";
 
-const IndexPage = lazy(() => import("@/pages/Index"));
-const Biens = lazy(() => import("@/pages/Biens"));
-const Amortissements = lazy(() => import("@/pages/Amortissements"));
-const MaintenancesEnCours = lazy(() => import("@/pages/MaintenancesEnCours"));
-const Consomptibles = lazy(() => import("@/pages/Consomptibles"));
-const ConsomptiblesBilanGlobal = lazy(() => import("@/pages/ConsomptiblesBilanGlobal"));
-const Inventaires = lazy(() => import("@/pages/Inventaires"));
-const Maintenance = lazy(() => import("@/pages/Maintenance"));
-const Programmation = lazy(() => import("@/pages/Programmation"));
-const Projets = lazy(() => import("@/pages/Projets"));
-const Statistiques = lazy(() => import("@/pages/Statistiques"));
-const Configuration = lazy(() => import("@/pages/Configuration"));
-const Authentification = lazy(() => import("@/pages/Authentification"));
+// Les importateurs sont partagés avec le préchargement (routePrefetch.ts) :
+// un lien survolé télécharge déjà le code de sa page, si bien que le clic
+// est instantané. Le cast est nécessaire car routeImporters est typé de
+// façon générique.
+const page = (path: keyof typeof routeImporters) =>
+  lazy(routeImporters[path] as () => Promise<{ default: React.ComponentType }>);
+
+const IndexPage = page("/");
+const Biens = page("/biens");
+const Amortissements = page("/biens/amortissements");
+const MaintenancesEnCours = page("/biens/maintenances-en-cours");
+const Consomptibles = page("/consomptibles");
+const ConsomptiblesBilanGlobal = page("/consomptibles/bilan-global");
+const Inventaires = page("/inventaires");
+const Maintenance = page("/maintenance");
+const Programmation = page("/programmation");
+const Projets = page("/projets");
+const Statistiques = page("/statistiques");
+const Configuration = page("/configuration");
+const Authentification = page("/authentification");
 const NotFound = lazy(() => import("@/pages/NotFound"));
-const Profile = lazy(() => import("@/pages/Profile"));
+const Profile = page("/profile");
+
 
 const withSuspense = (element: React.ReactNode) => (
   <Suspense

@@ -47,8 +47,7 @@ security:
         - { path: ^/$, roles: PUBLIC_ACCESS }
 
         # 2. Périmètre API globalement sécurisé
-        # - { path: ^/, roles: ROLE_USER }
-        - { path: ^/, roles: PUBLIC_ACCESS }
+        - { path: ^/, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:
     security:

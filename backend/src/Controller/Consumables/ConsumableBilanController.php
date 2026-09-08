@@ -3,7 +3,9 @@
 namespace App\Controller\Consumables;
 
 use App\Entity\Consumable;
+use App\Entity\User;
 use App\Repository\ConsumableRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -11,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -49,13 +52,17 @@ final class ConsumableBilanController extends AbstractController
     public function __invoke(
         int $id,
         Request $request,
+        #[CurrentUser] User $user,
         ConsumableRepository $consumableRepository,
+        ConsumableAccessChecker $accessChecker,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
         $consumable = $consumableRepository->getActiveById($id);
         if (!$consumable instanceof Consumable) {
             return $apiResponse->error('Le consomptible demandé est introuvable.', Response::HTTP_NOT_FOUND);
         }
+
+        $accessChecker->assertCanAccessConsumable($user, $consumable);
 
         $dateDebut = $request->query->get('dateDebut');
         $dateFin = $request->query->get('dateFin');

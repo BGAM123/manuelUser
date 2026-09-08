@@ -126,6 +126,11 @@ class Asset
     private ?string $fournisseurNom = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    #[Groups(['asset:list', 'asset:detail'])]
+    private ?string $unite_mesure = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Email(message: "L'email du fournisseur n'est pas valide.")]
     #[Assert\Length(max: 255)]
     #[Groups(['asset:detail'])]
@@ -320,12 +325,12 @@ class Asset
     private Collection $assetReformRequests;
 
     /**
-     * ✅ Utilisateur de restitution du bien (optionnel)
+     * ✅ Service de restitution du bien (optionnel)
      */
-    #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'user_restitution_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: Service::class)]
+    #[ORM\JoinColumn(name: 'service_restitution_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['asset:detail'])]
-    private ?User $userRestitution = null;
+    private ?Service $serviceRestitution = null;
 
     /**
      * @var Collection<int, AssetSecurity>
@@ -653,6 +658,18 @@ class Asset
     public function getFournisseurNom(): ?string
     {
         return $this->fournisseurNom;
+    }
+
+    public function getUnite_mesure(): ?string
+    {
+        return $this->unite_mesure;
+    }
+
+    public function setUnite_mesure(?string $unite_mesure): static
+    {
+        $this->unite_mesure = $unite_mesure;
+
+        return $this;
     }
 
     public function setFournisseurNom(?string $fournisseurNom): static
@@ -998,16 +1015,16 @@ class Asset
     }
 
     /**
-     * ✅ Utilisateur de restitution du bien
+     * ✅ Service de restitution du bien
      */
-    public function getUserRestitution(): ?User
+    public function getServiceRestitution(): ?Service
     {
-        return $this->userRestitution;
+        return $this->serviceRestitution;
     }
 
-    public function setUserRestitution(?User $userRestitution): static
+    public function setServiceRestitution(?Service $serviceRestitution): static
     {
-        $this->userRestitution = $userRestitution;
+        $this->serviceRestitution = $serviceRestitution;
 
         return $this;
     }

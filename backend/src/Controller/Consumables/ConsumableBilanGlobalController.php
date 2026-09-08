@@ -2,7 +2,9 @@
 
 namespace App\Controller\Consumables;
 
+use App\Entity\User;
 use App\Repository\ConsumableRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -10,6 +12,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -23,6 +26,7 @@ final class ConsumableBilanGlobalController extends AbstractController
     )]
     #[OA\Parameter(name: 'dateDebut', in: 'query', schema: new OA\Schema(type: 'string', format: 'date'), description: 'Date de début (YYYY-MM-DD)')]
     #[OA\Parameter(name: 'dateFin', in: 'query', schema: new OA\Schema(type: 'string', format: 'date'), description: 'Date de fin (YYYY-MM-DD)')]
+    #[OA\Response(response: 403, description: 'Forbidden - réservé aux administrateurs (bilan tous services confondus)')]
     #[OA\Response(
         response: 200,
         description: 'Success',
@@ -50,9 +54,20 @@ final class ConsumableBilanGlobalController extends AbstractController
     )]
     public function __invoke(
         Request $request,
+        #[CurrentUser] User $user,
         ConsumableRepository $consumableRepository,
+        ConsumableAccessChecker $accessChecker,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
+        // Ce bilan agrège tous les consomptibles de tous les services sans filtre possible
+        // par service : réservé aux administrateurs.
+        if (!$accessChecker->isAdmin($user)) {
+            return $apiResponse->error(
+                "Vous n'êtes pas autorisé à consulter le bilan global de tous les services.",
+                Response::HTTP_FORBIDDEN
+            );
+        }
+
         $dateDebut = $request->query->get('dateDebut');
         $dateFin = $request->query->get('dateFin');
 

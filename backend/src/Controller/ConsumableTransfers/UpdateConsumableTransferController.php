@@ -3,7 +3,9 @@
 namespace App\Controller\ConsumableTransfers;
 
 use App\Entity\ConsumableTransfer;
+use App\Entity\User;
 use App\Exception\ValidationFailedException;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableTransferService;
 use App\Service\UploadedFilesNormalizer;
@@ -13,6 +15,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -51,9 +54,13 @@ final class UpdateConsumableTransferController extends AbstractController
     public function __invoke(
         ConsumableTransfer $transfer,
         Request $request,
+        #[CurrentUser] User $user,
+        ConsumableAccessChecker $accessChecker,
         ConsumableTransferService $consumableTransferService,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
+        $accessChecker->assertCanAccessTransfer($user, $transfer);
+
         if ($transfer->isDelete()) {
             return $apiResponse->error('Ce transfert est supprimé.', Response::HTTP_CONFLICT);
         }

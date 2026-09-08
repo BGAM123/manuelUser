@@ -4,6 +4,7 @@ namespace App\Controller\Stock;
 
 use App\Service\ApiResponseFactory;
 use App\Service\GestionStockConsommableService;
+use App\Service\GlobalPatrimoineService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,6 +18,7 @@ class GestionStockConsommableController extends AbstractController
     public function __construct(
         private readonly GestionStockConsommableService $gestionStockService,
         private readonly ApiResponseFactory $apiResponse,
+        private readonly GlobalPatrimoineService $globalPatrimoineService,
     ) {
     }
 

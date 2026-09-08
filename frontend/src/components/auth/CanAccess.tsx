@@ -12,7 +12,7 @@
  */
 
 import type { ReactNode } from "react";
-import { usePermission } from "@/hooks/usePermission";
+import { useCanAccess } from "@/hooks/useCanAccess";
 
 interface CanAccessProps {
   /** Permission unique requise. */
@@ -33,12 +33,15 @@ export function CanAccess({
   fallback = null,
   children,
 }: CanAccessProps) {
-  const { hasPermission, hasAnyPermission, hasAllPermissions } = usePermission();
+  const { can, canAny, canAll } = useCanAccess();
 
+  // Un tableau explicitement vide (anyOf={[]}/allOf={[]}) doit refuser
+  // l'accès, pas retomber sur le "true" par défaut — sinon une section sans
+  // permission mappée (ou un bug de mapping) resterait accessible à tous.
   let allowed = true;
-  if (permission) allowed = hasPermission(permission);
-  else if (anyOf?.length) allowed = hasAnyPermission(anyOf);
-  else if (allOf?.length) allowed = hasAllPermissions(allOf);
+  if (permission !== undefined) allowed = can(permission);
+  else if (anyOf !== undefined) allowed = canAny(anyOf);
+  else if (allOf !== undefined) allowed = canAll(allOf);
 
   return allowed ? <>{children}</> : <>{fallback}</>;
 }

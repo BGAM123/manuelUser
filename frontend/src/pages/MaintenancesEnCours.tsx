@@ -22,7 +22,7 @@ import { YearStepper } from "@/components/shared/YearStepper";
 import { cn } from "@/utils/utils";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useConnectedUser } from "@/hooks/useConnectedUser";
-import { formatFCFA } from "@/api/common";
+import { formatFCFA, formatAmount } from "@/api/common";
 import { listCategories } from "@/api/categories/categories.api";
 import { listAssetTypes } from "@/api/asset-types/asset-types.api";
 import {
@@ -233,7 +233,7 @@ export default function MaintenancesEnCoursPage() {
                         <td className="px-3 py-2">{r.typeBien?.nom ?? "—"}</td>
                         <td className="px-3 py-2">{r.maintenance.etatBien?.nom ?? "—"}</td>
                         <td className="px-3 py-2">{r.maintenance.motif}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatFCFA(Number(r.maintenance.cout))}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatAmount(Number(r.maintenance.cout))}</td>
                         <td className="px-3 py-2">{r.maintenance.dateIntervention}</td>
                         <td className="px-3 py-2">
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
@@ -272,7 +272,7 @@ export default function MaintenancesEnCoursPage() {
                     >
                       <td className="px-3 py-2 font-medium">{g.categorie.nom}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{g.nombre_maintenances}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatFCFA(g.cout_total)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatAmount(g.cout_total)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{g.categorie.seuil ?? "—"}</td>
                     </tr>
                   ))}

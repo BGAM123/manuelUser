@@ -93,7 +93,7 @@ class GetStockBienController extends AbstractController
             ),
             new OA\Parameter(
                 name: 'statut',
-                description: 'Filtrer par statut du bien (ACTIF, INACTIF, SORTIE, EN MAINTENANCE)',
+                description: 'Filtrer par statut du bien (ACTIF, INACTIF, SORTIS, EN MAINTENANCE)',
                 in: 'query',
                 required: false,
                 schema: new OA\Schema(type: 'string')

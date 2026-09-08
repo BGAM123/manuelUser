@@ -25,7 +25,7 @@ final class RestituerAssetController extends AbstractController
     #[OA\Post(
         path: '/assets/{id}/restituer',
         summary: 'Restituer un bien patrimonial',
-        description: 'Restitue un bien en créant une affectation de type RESTITUTION avec logique automatique. Si user_id non fourni, utilise userRestitution du bien. Si affectation en cours, renseigne dateFin automatiquement.'
+        description: 'Restitue un bien en créant une affectation de type RESTITUTION avec logique automatique. Si service_id non fourni, utilise serviceRestitution du bien. Si affectation en cours, renseigne dateFin automatiquement.'
     )]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'), example: 1)]
     #[OA\RequestBody(
@@ -34,7 +34,7 @@ final class RestituerAssetController extends AbstractController
             mediaType: 'application/json',
             schema: new OA\Schema(
                 properties: [
-                    new OA\Property(property: 'user_id', type: 'integer', nullable: true, example: 8, description: 'Optionnel. ID de l\'utilisateur de restitution. Si non fourni, utilise userRestitution du bien.'),
+                    new OA\Property(property: 'service_id', type: 'integer', nullable: true, example: 16, description: 'Optionnel. ID du service de restitution. Si non fourni, utilise serviceRestitution du bien.'),
                     new OA\Property(property: 'dateDebut', type: 'string', format: 'date', nullable: true, example: '2026-08-29', description: 'Optionnel. Date de début de la restitution. Si non fournie, utilise la date du jour.'),
                     new OA\Property(property: 'dateFin', type: 'string', format: 'date', nullable: true, example: '2026-08-29', description: 'Optionnel. Date de fin de l\'affectation précédente. Si non fournie, utilise la date du jour.'),
                     new OA\Property(property: 'commentaire', type: 'string', nullable: true, example: 'Restitution suite à fin de projet.'),

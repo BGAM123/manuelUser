@@ -106,6 +106,7 @@ final class UpdateAssetPostController extends AbstractController
                     new OA\Property(property: 'etat_bien_id', type: 'integer', nullable: true, example: 1),
                     new OA\Property(property: 'service_id', type: 'integer', nullable: true, example: 16, description: 'ID du service (optionnel, ignoré si user_id est fourni)'),
                     new OA\Property(property: 'user_id', type: 'integer', nullable: true, example: 8, description: 'ID de l\'utilisateur (optionnel, prioritaire sur service_id)'),
+                    new OA\Property(property: 'service_restitution_id', type: 'integer', nullable: true, example: 8, description: 'Optionnel. ID du service de restitution par défaut pour ce bien.)'),
                     new OA\Property(property: 'project_ids[]', type: 'array', items: new OA\Items(type: 'integer'), example: [3, 7]),
                     new OA\Property(
                         property: 'photos[]',

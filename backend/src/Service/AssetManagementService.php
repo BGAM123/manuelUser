@@ -46,6 +46,7 @@ final class AssetManagementService
         private readonly EntityManagerInterface $entityManager,
         private readonly UserRepository $userRepository,  // ✅ Ajouter
         private readonly AssetAssignmentRepository $assetAssignmentRepository,  // ✅ Ajouter
+        private readonly SecurityService $securityService,  // ✅ Ajouter pour attacher les pièces jointes
     ) {
     }
 
@@ -54,8 +55,10 @@ final class AssetManagementService
      * @param list<UploadedFile> $photos
      * @param list<UploadedFile> $documents
      * @param list<?string> $documentLabels
+     * @param list<UploadedFile> $securityDocuments
+     * @param list<?string> $securityDocumentLabels
      */
-    public function create(array $payload, array $photos = [], array $documents = [], array $documentLabels = [], array $champsExistants = [], array $champsNouveaux = [], array $champsValeurs = [], ?\App\Entity\User $currentUser = null): Asset
+    public function create(array $payload, array $photos = [], array $documents = [], array $documentLabels = [], array $champsExistants = [], array $champsNouveaux = [], array $champsValeurs = [], ?\App\Entity\User $currentUser = null, array $securityDocuments = [], array $securityDocumentLabels = []): Asset
     {
         $asset = new Asset();
         $now = new \DateTimeImmutable();
@@ -136,10 +139,11 @@ final class AssetManagementService
         $this->entityManager->beginTransaction();
 
         try {
-            // ✅ Créer une sécurisation automatique si securityMode est fourni
-            $this->createSecurityIfProvided($asset, $payload);
-
+            // ✅ Persister l'asset d'abord pour avoir son ID
             $this->assetRepository->save($asset);
+
+            // ✅ Créer une sécurisation automatique si securityMode est fourni
+            $this->createSecurityIfProvided($asset, $payload, $securityDocuments, $securityDocumentLabels);
 
             // ✅ Créer une affectation si user_id ou service_id est fourni
             $this->createOrUpdateAssignment($asset, $payload, $currentUser);
@@ -487,6 +491,10 @@ private function processChampsValeurs(Asset $asset, array $champsValeurs): void
             $asset->setQuantiteStock(null === $raw ? null : (int) $raw);
         }
 
+        if (array_key_exists('unite_mesure', $payload)) {
+            $asset->setUnite_mesure($this->nullableString($payload['unite_mesure']));
+        }
+
         if (array_key_exists('typeFournisseur', $payload)) {
             $asset->setTypeFournisseur($this->nullableString($payload['typeFournisseur']));
         }
@@ -509,17 +517,17 @@ private function processChampsValeurs(Asset $asset, array $champsValeurs): void
             $asset->setFournisseurPays($this->nullableString($payload['fournisseurPays']));
         }
 
-        // ✅ Gestion de l'utilisateur de restitution
-        if (array_key_exists('user_restitution_id', $payload)) {
-            $userRestitutionId = $payload['user_restitution_id'];
-            if (null === $userRestitutionId || '' === $userRestitutionId) {
-                $asset->setUserRestitution(null);
+        // ✅ Gestion du service de restitution
+        if (array_key_exists('service_restitution_id', $payload)) {
+            $serviceRestitutionId = $payload['service_restitution_id'];
+            if (null === $serviceRestitutionId || '' === $serviceRestitutionId) {
+                $asset->setServiceRestitution(null);
             } else {
-                $userRestitution = $this->userRepository->find((int) $userRestitutionId);
-                if (!$userRestitution) {
-                    throw ResourceNotFoundException::for('utilisateur de restitution');
+                $serviceRestitution = $this->serviceRepository->getServiceById((int) $serviceRestitutionId);
+                if (!$serviceRestitution) {
+                    throw ResourceNotFoundException::for('service de restitution');
                 }
-                $asset->setUserRestitution($userRestitution);
+                $asset->setServiceRestitution($serviceRestitution);
             }
         }
 
@@ -971,8 +979,10 @@ private function processChampsValeurs(Asset $asset, array $champsValeurs): void
      *
      * @param Asset $asset
      * @param array<string, mixed> $payload
+     * @param list<UploadedFile> $securityDocuments
+     * @param list<?string> $securityDocumentLabels
      */
-    private function createSecurityIfProvided(Asset $asset, array $payload): void
+    private function createSecurityIfProvided(Asset $asset, array $payload, array $securityDocuments = [], array $securityDocumentLabels = []): void
     {
         $securityMode = $payload['securityMode'] ?? null;
         
@@ -994,5 +1004,44 @@ private function processChampsValeurs(Asset $asset, array $champsValeurs): void
         // Persister les entités
         $this->entityManager->persist($security);
         $this->entityManager->persist($assetSecurity);
+
+        // ✅ Attacher les pièces jointes de sécurisation si fournies (logique copiée de SecurityService::create)
+        if (!empty($securityDocuments)) {
+            // Flush pour obtenir l'ID de la sécurisation
+            $this->entityManager->flush();
+
+            // Normaliser les labels
+            $securityDocumentLabels = \App\Service\UploadedFilesNormalizer::parseLabelList($securityDocumentLabels);
+
+            foreach (array_values($securityDocuments) as $index => $document) {
+                if (!$document instanceof UploadedFile) {
+                    continue;
+                }
+                if (UPLOAD_ERR_NO_FILE === $document->getError()) {
+                    continue;
+                }
+                if (!$document->isValid()) {
+                    throw new ValidationFailedException(['securityPiecesJointes' => 'Fichier invalide : ' . $document->getErrorMessage()]);
+                }
+
+                $label = $securityDocumentLabels[$index] ?? null;
+                if (null === $label || '' === trim((string) $label)) {
+                    $label = $document->getClientOriginalName();
+                }
+
+                $piece = $this->fileUploadService->upload(
+                    $document,
+                    \App\Service\FileUploadService::KIND_DOCUMENT,
+                    (string) $label,
+                    true
+                );
+
+                $securityDocument = new \App\Entity\SecurityDocument();
+                $securityDocument->setSecurity($security);
+                $securityDocument->setPieceJointe($piece);
+                $this->entityManager->persist($securityDocument);
+                $security->addSecurityDocument($securityDocument);
+            }
+        }
     }
 }

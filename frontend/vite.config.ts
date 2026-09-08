@@ -10,12 +10,14 @@ export default defineConfig({
     port: 8080,
     strictPort: true,
     proxy: {
-      // Redirige /api/* → http://185.98.136.192:8075/* (évite les problèmes CORS en dev)
-      "/api": {
+      // Redirige /backend-api/* → http://185.98.136.192:8075/*
+      // (évite les problèmes CORS en dev ; /api est réservé par l'environnement
+      // de prévisualisation et renvoyait une erreur 500)
+      "/backend-api": {
         // target: "http://127.0.0.1:8000",
         target: "http://185.98.136.192:8075",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
+        rewrite: (path) => path.replace(/^\/backend-api/, ""),
       },
       // Fichiers uploadés (photos, pièces jointes) — servis directement par le
       // backend hors du préfixe /api, donc besoin de sa propre règle de proxy.

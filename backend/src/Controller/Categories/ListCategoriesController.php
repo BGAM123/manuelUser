@@ -44,7 +44,7 @@ final class ListCategoriesController extends AbstractController
                 'data' => [
                     'meta' => ['current_page' => 1, 'limit' => 10, 'total_items' => 6, 'total_pages' => 1],
                     'data' => [
-                        ['id' => 1, 'nom' => 'Véhicules', 'description' => null, 'is_delete' => false, 'seuil' => 1000000, 'consommable' => false],
+                        ['id' => 1, 'nom' => 'Véhicules', 'description' => null, 'is_delete' => false, 'seuil' => 1000000, 'ordre' => 1, 'consommable' => false],
                     ],
                 ],
             ]

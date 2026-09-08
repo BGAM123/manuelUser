@@ -3,7 +3,9 @@
 namespace App\Controller\ConsumableTransfers;
 
 use App\Entity\ConsumableTransfer;
+use App\Entity\User;
 use App\Exception\ResourceInUseException;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableStockManager;
 use App\Service\ForceDeleteService;
@@ -12,6 +14,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -29,10 +32,14 @@ final class ForceDeleteConsumableTransferController extends AbstractController
     #[OA\Response(response: 404, description: 'Not Found', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le transfert demandé est introuvable.', 'data' => null]))]
     public function __invoke(
         ConsumableTransfer $transfer,
+        #[CurrentUser] User $user,
+        ConsumableAccessChecker $accessChecker,
         ForceDeleteService $forceDeleteService,
         ConsumableStockManager $stockManager,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
+        $accessChecker->assertCanAccessTransfer($user, $transfer);
+
         $consumable = $transfer->getConsumable();
 
         try {

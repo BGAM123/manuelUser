@@ -36,7 +36,8 @@ class CategoryRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('c')
             ->where('c.isDelete = false')
-            ->orderBy('c.nom', 'ASC')
+            // ->orderBy('c.ordre', 'ASC')
+            ->addOrderBy('c.nom', 'ASC')
             ->getQuery()
             ->getResult();
     }
@@ -249,9 +250,13 @@ class CategoryRepository extends ServiceEntityRepository
         if (array_key_exists('seuil', $payload)) {
             $category->setSeuil(null !== $payload['seuil'] ? (int) $payload['seuil'] : null);
         }
+        if (array_key_exists('ordre', $payload)) {
+            $category->setOrdre(null !== $payload['ordre'] ? (int) $payload['ordre'] : null);
+        }
         if (array_key_exists('consommable', $payload)) {
             $category->setConsommable((bool) $payload['consommable']);
         }
+
         $category->setUpdatedAt(new \DateTimeImmutable());
     }
 

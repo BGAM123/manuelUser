@@ -33,6 +33,7 @@ import {
 } from "@/hooks/useStatistiques";
 import { toast } from "sonner";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 
 const INITIAL_FILTERS: FilterState = {
   // Champs d'affichage UI
@@ -411,25 +412,29 @@ export default function StatistiquesPage() {
         {/* ── Affichage de la vue active ───────────────────────────────────── */}
         <div className="transition-all duration-300">
           {activeTab === "global" && (
-            <GlobalDashboardView
-              filters={filters}
-              widgetVis={widgetVis}
-              onNavigateTab={(tab) => handleTabChange(tab)}
-              onFilterRegion={(reg) => handleFilterChange("region", reg)}
-            />
+            <CanAccess anyOf={["consultation_tableau_bord", "consultation_statistiques"]}>
+              <GlobalDashboardView
+                filters={filters}
+                widgetVis={widgetVis}
+                onNavigateTab={(tab) => handleTabChange(tab)}
+                onFilterRegion={(reg) => handleFilterChange("region", reg)}
+              />
+            </CanAccess>
           )}
 
-          {activeTab === "vehicules" && <VehiculesKpisView filters={filters} />}
+          <CanAccess permission="consultation_statistiques">
+            {activeTab === "vehicules" && <VehiculesKpisView filters={filters} />}
 
-          {activeTab === "terrains" && <TerrainsKpisView filters={filters} />}
+            {activeTab === "terrains" && <TerrainsKpisView filters={filters} />}
 
-          {activeTab === "batiments" && <BatimentsKpisView filters={filters} />}
+            {activeTab === "batiments" && <BatimentsKpisView filters={filters} />}
 
-          {activeTab === "informatique" && <InformatiqueKpisView filters={filters} />}
+            {activeTab === "informatique" && <InformatiqueKpisView filters={filters} />}
 
-          {activeTab === "structures" && <StructuresKpisView filters={filters} />}
+            {activeTab === "structures" && <StructuresKpisView filters={filters} />}
 
-          {activeTab === "suivi" && <SuiviAlertesKpisView filters={filters} />}
+            {activeTab === "suivi" && <SuiviAlertesKpisView filters={filters} />}
+          </CanAccess>
         </div>
       </div>
     </AppShell>

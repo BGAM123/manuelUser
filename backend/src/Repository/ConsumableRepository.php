@@ -254,8 +254,16 @@ class ConsumableRepository extends ServiceEntityRepository
         }
 
         if ($serviceId) {
-            $qb->andWhere('c.service = :serviceId')
-                ->setParameter('serviceId', $serviceId);
+            // Un consomptible "appartient" à un service soit parce qu'il y est enregistré
+            // (c.service), soit parce que ce service en détient du stock reçu par transfert
+            // (serviceDestination) — un service ne peut pas retransférer ce qu'il ne peut
+            // pas voir.
+            $qb->andWhere(
+                'c.service = :serviceId OR EXISTS ('
+                . 'SELECT 1 FROM App\Entity\ConsumableTransfer ct '
+                . 'WHERE ct.consumable = c.id AND ct.serviceDestination = :serviceId AND ct.isDelete = false'
+                . ')'
+            )->setParameter('serviceId', $serviceId);
         }
         // 🔥 FILTRE PAR CATÉGORIES
         if ($categoryIds && !empty($categoryIds)) {
@@ -282,8 +290,12 @@ class ConsumableRepository extends ServiceEntityRepository
         }
 
         if ($serviceId) {
-            $qb->andWhere('c.service = :serviceId')
-                ->setParameter('serviceId', $serviceId);
+            $qb->andWhere(
+                'c.service = :serviceId OR EXISTS ('
+                . 'SELECT 1 FROM App\Entity\ConsumableTransfer ct '
+                . 'WHERE ct.consumable = c.id AND ct.serviceDestination = :serviceId AND ct.isDelete = false'
+                . ')'
+            )->setParameter('serviceId', $serviceId);
         }
 
         // 🔥 FILTRE PAR CATÉGORIES

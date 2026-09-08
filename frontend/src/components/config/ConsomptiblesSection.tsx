@@ -79,6 +79,7 @@ import {
 import { Pagination } from "@/components/shared/Pagination";
 import { useT } from "@/utils/i18n";
 import { useConnectedUser } from "@/hooks/useConnectedUser";
+import { CanAccess } from "@/components/auth/CanAccess";
 import { cn } from "@/utils/utils";
 import {
   listConsumables,
@@ -92,7 +93,7 @@ import {
   type CreateConsumablePayload,
   type UpdateConsumablePayload,
 } from "@/api/consumables/consumables.api";
-import { formatFCFA } from "@/api/common";
+import { formatFCFA, formatAmount } from "@/api/common";
 import { getConsumablesBilanGlobal, type ApiConsumableBilanGlobalEntry } from "@/api/consumables/consumables.api";
 import {
   listConsumableTransfersByService,
@@ -226,8 +227,35 @@ export function ConsomptiblesSection() {
     enabled: myServiceId != null,
     staleTime: 30_000,
   });
-  const myTransfers: ApiConsumableTransfer[] = myTransfersData ?? [];
+  const myTransfers: ApiConsumableTransfer[] = (myTransfersData ?? [])
+    .filter((t) => t.serviceDestination?.id === myServiceId)
+    .sort((a, b) => {
+      if (a.isAcknowledged === b.isAcknowledged) return 0;
+      return a.isAcknowledged ? 1 : -1;
+    });
   const invalidateMyTransfers = () => queryClient.invalidateQueries({ queryKey: myTransfersQueryKey });
+
+  // Les consomptibles transférés proviennent d'autres services.
+  // singleServiceQuery ne les renvoie donc pas.
+  // On doit les récupérer individuellement pour afficher leur prix, description et les actions.
+  const missingConsumableIds = useMemo(() => {
+    const ids = myTransfers.map((t) => t.consumable?.id).filter((id): id is number => id != null);
+    const uniqueIds = Array.from(new Set(ids));
+    return uniqueIds.filter((id) => !consumables.some((c) => c.id === id));
+  }, [myTransfers, consumables]);
+
+  const missingConsumablesQueries = useQueries({
+    queries: missingConsumableIds.map((id) => ({
+      queryKey: ["consumables", id],
+      queryFn: () => getConsumableById(id),
+      staleTime: 60_000,
+    })),
+  });
+
+  const allConsumables = useMemo(() => {
+    const fetched = missingConsumablesQueries.map((q) => q.data?.data).filter((c): c is import("@/api/consumables/consumables.api").ApiConsumable => !!c);
+    return [...consumables, ...fetched];
+  }, [consumables, missingConsumablesQueries]);
 
   const [selectedTransferIds, setSelectedTransferIds] = useState<Set<number>>(new Set());
   const toggleTransfer = (id: number) =>
@@ -257,12 +285,27 @@ export function ConsomptiblesSection() {
 
   const acknowledgeMutation = useMutation({
     mutationFn: (ids: number[]) => acknowledgeConsumableTransfersBatch(ids),
+    onMutate: async (ids: number[]) => {
+      await queryClient.cancelQueries({ queryKey: myTransfersQueryKey });
+      const previous = queryClient.getQueryData<ApiConsumableTransfer[]>(myTransfersQueryKey);
+      if (previous) {
+        queryClient.setQueryData<ApiConsumableTransfer[]>(
+          myTransfersQueryKey,
+          previous.map((t) => (ids.includes(t.id) ? { ...t, isAcknowledged: true } : t)),
+        );
+      }
+      return { previous };
+    },
     onSuccess: () => {
       setSelectedTransferIds(new Set());
       invalidateMyTransfers();
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
       toast.success(t("consumables.toast.receiptAcknowledged"));
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(myTransfersQueryKey, context.previous);
+      }
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg ?? t("consumables.error.acknowledgeReceipt"));
     },
@@ -328,22 +371,26 @@ export function ConsomptiblesSection() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">{t("nav.consomptibles")}</h2>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => navigate("/consomptibles/bilan-global")}
-            >
-              <BarChart3 className="h-4 w-4" /> {t("consumables.bilanGlobal.button")}
-            </Button>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setSelected(null);
-                setView("form");
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("consumables.new")}
-            </Button>
+            <CanAccess permission="consultation_bilan_consomptible">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => navigate("/consomptibles/bilan-global")}
+              >
+                <BarChart3 className="h-4 w-4" /> {t("consumables.bilanGlobal.button")}
+              </Button>
+            </CanAccess>
+            <CanAccess permission="creation_consomptible">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setSelected(null);
+                  setView("form");
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("consumables.new")}
+              </Button>
+            </CanAccess>
           </div>
         </div>
         <p className="mb-3 text-sm text-muted-foreground">
@@ -378,167 +425,60 @@ export function ConsomptiblesSection() {
           </label>
         </div>
 
-        {myTransfers.length > 0 && (() => {
-          const hasAlreadyAcknowledgedSelected = Array.from(selectedTransferIds).some(
-            (id) => myTransfers.find((t) => t.id === id)?.isAcknowledged,
-          );
-          return (
-            <div className="mb-4">
-              <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
-                {t("consumables.myTransfers.title")}
-              </h3>
-              {selectedTransferIds.size > 0 && (
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
-                  <span className="text-sm font-semibold text-primary">
-                    {t("consumables.myTransfers.selectedCount", { count: selectedTransferIds.size })}
-                  </span>
-                  <Button
-                    size="sm"
-                    className="gap-2 h-9"
-                    onClick={() => acknowledgeMutation.mutate(Array.from(selectedTransferIds))}
-                    disabled={acknowledgeMutation.isPending || hasAlreadyAcknowledgedSelected}
-                    title={hasAlreadyAcknowledgedSelected ? t("consumables.myTransfers.alreadyReceived") : undefined}
-                  >
-                    {acknowledgeMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckSquare className="h-4 w-4" />
-                    )}
-                    {t("consumables.acknowledgeReceipt")}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTransferIds(new Set())}
-                    className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-              <div className="rounded-xl border border-border bg-card shadow-sm overflow-x-auto">
-                <table className="w-full min-w-[900px] text-sm">
-                  <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="w-8 px-3 py-3" />
-                      <th className="px-3 py-3 text-left">{t("consumables.field.name")}</th>
-                      <th className="px-3 py-3 text-left">{t("consumables.field.service")}</th>
-                      <th className="px-3 py-3 text-left">{t("consumables.field.quantity")}</th>
-                      <th className="px-3 py-3 text-left">{t("consumables.field.unitPrice")}</th>
-                      <th className="px-3 py-3 text-left">{t("consumables.field.totalPrice")}</th>
-                      <th className="px-3 py-3 text-left">{t("common.description")}</th>
-                      <th className="px-3 py-3 text-left">{t("consumables.field.consumed")}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {myTransfers.map((tr) => {
-                      const isGrise = !tr.isAcknowledged;
-                      const consommable = tr.consumable;
-                      const matchC = consumables.find((c) => c.id === consommable?.id);
-                      const prix = matchC?.prixInitial ?? null;
-                      const prixTotal = prix != null ? prix * tr.quantite : null;
-                      return (
-                        <tr key={`tr-${tr.id}`} className={cn("transition-colors", isGrise ? "bg-muted/40 opacity-60" : "bg-emerald-50/30")}>
-                          <td className="px-3 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedTransferIds.has(tr.id)}
-                              onChange={() => toggleTransfer(tr.id)}
-                              className="h-4 w-4 cursor-pointer accent-primary"
-                              aria-label={t("action.select")}
-                            />
-                          </td>
-                          <td className="px-3 py-3 font-medium">
-                            <span className="inline-flex items-center gap-1.5">
-                              {consommable?.nom ?? "—"}
-                              {!isGrise && (
-                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label={t("consumables.receiptAcknowledgedLabel")} />
-                              )}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-xs text-muted-foreground">{tr.serviceDestination?.nom ?? "—"}</td>
-                          <td className="px-3 py-3 tabular-nums">{tr.quantite.toLocaleString("fr-FR")}</td>
-                          <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                            {prix != null ? formatFCFA(prix) : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                            {prixTotal != null ? formatFCFA(prixTotal) : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-xs text-muted-foreground max-w-xs truncate">
-                            {matchC?.description ?? "—"}
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className={cn("flex items-center gap-1", isGrise && "pointer-events-none opacity-40")}>
-                              <button
-                                type="button"
-                                disabled={isGrise || consumeMutation.isPending || tr.quantityConsumed <= 0}
-                                onClick={() => consumeMutation.mutate({ id: tr.id, quantityConsumed: Math.max(0, tr.quantityConsumed - 1) })}
-                                className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
-                              {/* Saisie manuelle en plus des +/- — plus rapide pour de grosses
-                                  quantités. Non contrôlé (defaultValue + commit au blur/Entrée) :
-                                  la clé inclut quantityConsumed pour se réinitialiser proprement
-                                  dès que la valeur serveur change. */}
-                              <input
-                                key={`consumed-${tr.id}-${tr.quantityConsumed}`}
-                                type="number"
-                                min={0}
-                                max={tr.quantite}
-                                defaultValue={tr.quantityConsumed}
-                                disabled={isGrise || consumeMutation.isPending}
-                                onBlur={(e) => {
-                                  const raw = Number(e.target.value);
-                                  if (Number.isNaN(raw)) { e.target.value = String(tr.quantityConsumed); return; }
-                                  const clamped = Math.max(0, Math.min(tr.quantite, Math.floor(raw)));
-                                  if (clamped !== tr.quantityConsumed) consumeMutation.mutate({ id: tr.id, quantityConsumed: clamped });
-                                  else e.target.value = String(tr.quantityConsumed);
-                                }}
-                                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                className="h-7 w-14 rounded border border-border bg-background text-center text-sm font-semibold tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              />
-                              <button
-                                type="button"
-                                disabled={isGrise || consumeMutation.isPending || tr.quantityConsumed >= tr.quantite}
-                                onClick={() => consumeMutation.mutate({ id: tr.id, quantityConsumed: Math.min(tr.quantite, tr.quantityConsumed + 1) })}
-                                className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
-                                title={tr.quantityConsumed >= tr.quantite ? t("consumables.maxQuantityReached") : undefined}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })()}
+        {/* Barre d'action groupée pour l'accusé de réception des transferts sélectionnés */}
+        {selectedTransferIds.size > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <span className="text-sm font-semibold text-primary">
+              {t("consumables.myTransfers.selectedCount", { count: selectedTransferIds.size })}
+            </span>
+            <CanAccess permission="gestion_stock">
+              <Button
+                size="sm"
+                className="gap-2 h-9"
+                onClick={() => acknowledgeMutation.mutate(Array.from(selectedTransferIds))}
+                disabled={acknowledgeMutation.isPending}
+              >
+                {acknowledgeMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckSquare className="h-4 w-4" />
+                )}
+                {t("consumables.acknowledgeReceipt")}
+              </Button>
+            </CanAccess>
+            <button
+              type="button"
+              onClick={() => setSelectedTransferIds(new Set())}
+              className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{t("consumables.catalog")}</h3>
-        {consumables.length === 0 ? (
+        {consumables.length === 0 && myTransfers.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border p-12 text-center">
             <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">{t("consumables.empty")}</p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => {
-                setSelected(null);
-                setView("form");
-              }}
-            >
-              {t("consumables.createFirst")}
-            </Button>
+            <CanAccess permission="creation_consomptible">
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => {
+                  setSelected(null);
+                  setView("form");
+                }}
+              >
+                {t("consumables.createFirst")}
+              </Button>
+            </CanAccess>
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-card shadow-sm overflow-x-auto">
             <table className="w-full min-w-[1000px] text-sm">
               <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
+                  {myTransfers.some((tr) => !tr.isAcknowledged) && <th className="w-8 px-3 py-3" />}
                   <th className="px-3 py-3 text-left">{t("common.name")}</th>
                   <th className="px-3 py-3 text-left">{t("common.category")}</th>
                   <th className="px-3 py-3 text-left">{t("consumables.field.service")}</th>
@@ -554,26 +494,256 @@ export function ConsomptiblesSection() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {/* ── Consomptibles du catalogue ── */}
+                {/* ── 1. Consomptibles transférés vers mon service ── */}
+                {myTransfers.map((tr) => {
+                  const isGrise = !tr.isAcknowledged;
+                  const matchC = allConsumables.find((c) => c.id === tr.consumable?.id);
+                  const nom = tr.consumable?.nom ?? matchC?.nom ?? "—";
+                  const categoryNom = matchC?.category?.nom ?? "—";
+                  const serviceNom = tr.serviceDestination?.nom ?? user?.service?.nom ?? "—";
+                  const stockActuel = Math.max(0, tr.quantite - tr.quantityConsumed);
+                  const prix = matchC?.prixInitial ?? null;
+                  const prixTotal = prix != null ? prix * tr.quantite : null;
+                  const description = matchC?.description ?? tr.observations ?? "—";
+                  const hasPendingInTable = myTransfers.some((t) => !t.isAcknowledged);
+
+                  return (
+                    <tr
+                      key={`tr-${tr.id}`}
+                      className={cn(
+                        "transition-colors",
+                        isGrise ? "bg-muted/40 opacity-60" : "hover:bg-muted/30",
+                      )}
+                    >
+                      {hasPendingInTable && (
+                        <td className="px-3 py-3">
+                          {isGrise ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedTransferIds.has(tr.id)}
+                              onChange={() => toggleTransfer(tr.id)}
+                              className="h-4 w-4 cursor-pointer accent-primary"
+                              aria-label={t("action.select")}
+                            />
+                          ) : null}
+                        </td>
+                      )}
+                      <td className="px-3 py-3 font-semibold">
+                        <span className="inline-flex items-center gap-1.5">
+                          {nom}
+                          {!isGrise && (
+                            <CheckCircle2
+                              className="h-3.5 w-3.5 shrink-0 text-emerald-600"
+                              aria-label={t("consumables.receiptAcknowledgedLabel")}
+                            />
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground">{categoryNom}</td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground">{serviceNom}</td>
+                      <td className="px-3 py-3 font-medium tabular-nums">{tr.quantite.toLocaleString("fr-FR")}</td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">—</td>
+                      <td className="px-3 py-3">
+                        <span
+                          className={cn(
+                            "font-semibold tabular-nums text-xs",
+                            stockActuel <= 5 ? "text-destructive" : "text-primary",
+                          )}
+                        >
+                          {stockActuel.toLocaleString("fr-FR")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
+                        {prix != null ? formatAmount(prix) : "—"}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
+                        {prixTotal != null ? formatAmount(prixTotal) : "—"}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground max-w-xs truncate" title={description}>
+                        {description}
+                      </td>
+                      <td className="px-3 py-3">
+                        {isGrise ? (
+                          <span className="text-xs text-muted-foreground italic font-medium">
+                            En attente
+                          </span>
+                        ) : (
+                          <CanAccess
+                            permission="enregistrement_consommation_consomptible"
+                            fallback={
+                              <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                                {tr.quantityConsumed.toLocaleString("fr-FR")}
+                              </span>
+                            }
+                          >
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={consumeMutation.isPending || tr.quantityConsumed <= 0}
+                              onClick={() =>
+                                consumeMutation.mutate({
+                                  id: tr.id,
+                                  quantityConsumed: Math.max(0, tr.quantityConsumed - 1),
+                                })
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
+                              aria-label={t("consumables.decreaseConsumedFor", { nom })}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <input
+                              key={`consumed-${tr.id}-${tr.quantityConsumed}`}
+                              type="number"
+                              min={0}
+                              max={tr.quantite}
+                              defaultValue={tr.quantityConsumed}
+                              disabled={consumeMutation.isPending}
+                              onInput={(e) => {
+                                const target = e.currentTarget;
+                                const clean = target.value.replace(/[^0-9]/g, "");
+                                if (clean === "") {
+                                  target.value = "";
+                                  return;
+                                }
+                                const num = parseInt(clean, 10);
+                                if (num > tr.quantite) {
+                                  target.value = String(tr.quantite);
+                                } else if (num < 0) {
+                                  target.value = "0";
+                                } else {
+                                  target.value = String(num);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const raw = e.target.value.trim() === "" ? 0 : Number(e.target.value);
+                                if (Number.isNaN(raw)) {
+                                  e.target.value = String(tr.quantityConsumed);
+                                  return;
+                                }
+                                const clamped = Math.max(0, Math.min(tr.quantite, Math.floor(raw)));
+                                e.target.value = String(clamped);
+                                if (clamped !== tr.quantityConsumed)
+                                  consumeMutation.mutate({ id: tr.id, quantityConsumed: clamped });
+                              }}
+                              onKeyDown={(e) => {
+                                if (
+                                  e.key === "-" ||
+                                  e.key === "e" ||
+                                  e.key === "E" ||
+                                  e.key === "+" ||
+                                  e.key === "." ||
+                                  e.key === ","
+                                ) {
+                                  e.preventDefault();
+                                }
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              className="h-7 w-14 rounded border border-border bg-background text-center text-sm font-semibold tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button
+                              type="button"
+                              disabled={
+                                consumeMutation.isPending || tr.quantityConsumed >= tr.quantite || stockActuel <= 0
+                              }
+                              onClick={() =>
+                                consumeMutation.mutate({
+                                  id: tr.id,
+                                  quantityConsumed: Math.min(tr.quantite, tr.quantityConsumed + 1),
+                                })
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
+                              aria-label={t("consumables.increaseConsumedFor", { nom })}
+                              title={
+                                tr.quantityConsumed >= tr.quantite
+                                  ? t("consumables.maxQuantityReached")
+                                  : undefined
+                              }
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          </CanAccess>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        {isGrise ? (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-300 bg-amber-500/15 text-xs text-amber-700"
+                          >
+                            En attente de réception
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="default"
+                            className="border-emerald-300 bg-emerald-500/15 text-xs text-emerald-700"
+                          >
+                            {t("status.active")}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {isGrise ? (
+                          <CanAccess permission="gestion_stock">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                              onClick={() => acknowledgeMutation.mutate([tr.id])}
+                              disabled={acknowledgeMutation.isPending}
+                            >
+                              {acknowledgeMutation.isPending ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <CheckSquare className="h-3.5 w-3.5" />
+                              )}
+                              {t("consumables.acknowledgeReceipt")}
+                            </Button>
+                          </CanAccess>
+                        ) : matchC ? (
+                          <CanAccess anyOf={["creation_transfert_consomptible", "suppression_transfert_consomptible"]}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                                  aria-label={t("consumables.actionsFor", { nom })}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setDetailTarget(matchC)}>
+                                  <ArrowLeftRight className="mr-2 h-4 w-4" /> {t("consumables.transfers")}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </CanAccess>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {/* ── 2. Consomptibles du catalogue ── */}
                 {consumables.map((c) => {
                   const bilan = bilanMap.get(c.id);
                   const total = c.prixInitial != null ? c.prixInitial * c.quantite : null;
-                  // `c.quantite` est la quantité restante réelle pour le calcul
-                  // du consommé (elle diminue quand on consomme, voir
-                  // consumeCatalogMutation) — mais elle NE bouge PAS quand on
-                  // transfère du stock vers un service. `totalEntrees` reste la
-                  // quantité d'origine, figée depuis la création — la
-                  // différence donne le consommé.
-                  const quantiteInitiale = bilan?.totalEntrees ?? c.quantite;
+                  const totalReceived = myTransfers
+                    .filter((tr) => tr.consumable?.nom === c.nom && tr.isAcknowledged)
+                    .reduce((acc, tr) => acc + tr.quantite, 0);
+
+                  const quantiteInitiale = Math.max(c.quantite, (bilan?.totalEntrees || 0) + totalReceived);
                   const consomme = Math.max(0, quantiteInitiale - c.quantite);
-                  // Stock réellement disponible = tient compte des transferts
-                  // (contrairement à `c.quantite`) — champ dédié renvoyé par
-                  // GET /consumables (ex. "4800"), pas le bilan-global qui a un
-                  // bug de doublage confirmé côté backend.
                   const stockActuel = c.stockActuel ?? c.quantite;
                   const isConsuming = consumeCatalogMutation.isPending && consumeCatalogMutation.variables?.id === c.id;
+                  const isOwner = myServiceId != null && c.service?.id === myServiceId;
+                  const maxConsommePossible = consomme + stockActuel;
+                  const hasPendingInTable = myTransfers.some((t) => !t.isAcknowledged);
+
                   return (
                     <tr key={`c-${c.id}`} className="hover:bg-muted/30 transition-colors">
+                      {hasPendingInTable && <td className="px-3 py-3" />}
                       <td className="px-3 py-3 font-semibold">{c.nom}</td>
                       <td className="px-3 py-3 text-xs text-muted-foreground">{c.category?.nom ?? "—"}</td>
                       <td className="px-3 py-3 text-xs text-muted-foreground">{c.service?.nom ?? "—"}</td>
@@ -587,58 +757,92 @@ export function ConsomptiblesSection() {
                         </span>
                       </td>
                       <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                        {c.prixInitial != null ? formatFCFA(c.prixInitial) : "—"}
+                        {c.prixInitial != null ? formatAmount(c.prixInitial) : "—"}
                       </td>
                       <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                        {total != null ? formatFCFA(total) : "—"}
+                        {total != null ? formatAmount(total) : "—"}
                       </td>
                       <td className="px-3 py-3 text-xs text-muted-foreground max-w-xs truncate" title={c.description ?? undefined}>
                         {c.description || "—"}
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            disabled={isConsuming || consomme <= 0}
-                            onClick={() => consumeCatalogMutation.mutate({ id: c.id, quantite: c.quantite + 1 })}
-                            className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
-                            aria-label={t("consumables.decreaseConsumedFor", { nom: c.nom })}
+                        {isOwner ? (
+                          <CanAccess
+                            permission="enregistrement_consommation_consomptible"
+                            fallback={
+                              <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                                {consomme.toLocaleString("fr-FR")}
+                              </span>
+                            }
                           >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          {/* Saisie manuelle en plus des +/- — plus rapide pour de grosses
-                              quantités. Non contrôlé (defaultValue + commit au blur/Entrée). */}
-                          <input
-                            key={`catalog-consumed-${c.id}-${consomme}`}
-                            type="number"
-                            min={0}
-                            max={quantiteInitiale}
-                            defaultValue={consomme}
-                            disabled={isConsuming}
-                            onBlur={(e) => {
-                              const raw = Number(e.target.value);
-                              if (Number.isNaN(raw)) { e.target.value = String(consomme); return; }
-                              const clampedConsomme = Math.max(0, Math.min(quantiteInitiale, Math.floor(raw)));
-                              if (clampedConsomme !== consomme) {
-                                consumeCatalogMutation.mutate({ id: c.id, quantite: quantiteInitiale - clampedConsomme });
-                              } else {
-                                e.target.value = String(consomme);
-                              }
-                            }}
-                            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                            className="h-7 w-14 rounded border border-border bg-background text-center text-sm font-semibold tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <button
-                            type="button"
-                            disabled={isConsuming || c.quantite <= 0}
-                            onClick={() => consumeCatalogMutation.mutate({ id: c.id, quantite: c.quantite - 1 })}
-                            className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
-                            aria-label={t("consumables.increaseConsumedFor", { nom: c.nom })}
-                            title={c.quantite <= 0 ? t("consumables.nothingToConsume") : undefined}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={isConsuming || consomme <= 0}
+                              onClick={() => consumeCatalogMutation.mutate({ id: c.id, quantite: c.quantite + 1 })}
+                              className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
+                              aria-label={t("consumables.decreaseConsumedFor", { nom: c.nom })}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            {/* Saisie manuelle en plus des +/- — bornée entre 0 et le stock disponible */}
+                            <input
+                              key={`catalog-consumed-${c.id}-${consomme}`}
+                              type="number"
+                              min={0}
+                              max={maxConsommePossible}
+                              defaultValue={consomme}
+                              disabled={isConsuming}
+                              onInput={(e) => {
+                                const target = e.currentTarget;
+                                const clean = target.value.replace(/[^0-9]/g, "");
+                                if (clean === "") {
+                                  target.value = "";
+                                  return;
+                                }
+                                const num = parseInt(clean, 10);
+                                if (num > maxConsommePossible) {
+                                  target.value = String(maxConsommePossible);
+                                } else if (num < 0) {
+                                  target.value = "0";
+                                } else {
+                                  target.value = String(num);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const raw = e.target.value.trim() === "" ? 0 : Number(e.target.value);
+                                if (Number.isNaN(raw)) { e.target.value = String(consomme); return; }
+                                const clampedConsomme = Math.max(0, Math.min(maxConsommePossible, Math.floor(raw)));
+                                e.target.value = String(clampedConsomme);
+                                if (clampedConsomme !== consomme) {
+                                  consumeCatalogMutation.mutate({ id: c.id, quantite: quantiteInitiale - clampedConsomme });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+" || e.key === "." || e.key === ",") {
+                                  e.preventDefault();
+                                }
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              className="h-7 w-14 rounded border border-border bg-background text-center text-sm font-semibold tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button
+                              type="button"
+                              disabled={isConsuming || stockActuel <= 0 || c.quantite <= 0}
+                              onClick={() => consumeCatalogMutation.mutate({ id: c.id, quantite: c.quantite - 1 })}
+                              className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-sm hover:bg-muted disabled:opacity-40"
+                              aria-label={t("consumables.increaseConsumedFor", { nom: c.nom })}
+                              title={stockActuel <= 0 || c.quantite <= 0 ? t("consumables.nothingToConsume") : undefined}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          </CanAccess>
+                        ) : (
+                          <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                            {consomme.toLocaleString("fr-FR")}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         {c.is_delete ? (
@@ -664,39 +868,47 @@ export function ConsomptiblesSection() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setDetailTarget(c)}>
-                              <ArrowLeftRight className="mr-2 h-4 w-4" /> {t("consumables.transfers")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={async () => {
-                                // La liste ne renvoie pas les pièces jointes (seul le
-                                // détail les inclut) — on recharge toujours le détail
-                                // avant d'ouvrir l'édition, même pattern que ChampsSection.
-                                setLoadingEditId(c.id);
-                                try {
-                                  const res = await getConsumableById(c.id);
-                                  setSelected(res.data ?? c);
-                                } catch {
-                                  setSelected(c);
-                                } finally {
-                                  setLoadingEditId(null);
-                                }
-                                setView("form");
-                              }}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" /> {t("action.edit")}
-                            </DropdownMenuItem>
-                            {c.is_delete ? (
-                              <DropdownMenuItem onClick={() => restoreMutation.mutate(c.id)}>
-                                <RotateCcw className="mr-2 h-4 w-4" /> {t("action.restore")}
+                            <CanAccess anyOf={["creation_transfert_consomptible", "suppression_transfert_consomptible"]}>
+                              <DropdownMenuItem onClick={() => setDetailTarget(c)}>
+                                <ArrowLeftRight className="mr-2 h-4 w-4" /> {t("consumables.transfers")}
                               </DropdownMenuItem>
-                            ) : (
+                            </CanAccess>
+                            <CanAccess permission="modification_consomptible">
                               <DropdownMenuItem
-                                onClick={() => setDeleteTarget(c)}
-                                className="text-destructive focus:text-destructive"
+                                onClick={async () => {
+                                  // La liste ne renvoie pas les pièces jointes (seul le
+                                  // détail les inclut) — on recharge toujours le détail
+                                  // avant d'ouvrir l'édition, même pattern que ChampsSection.
+                                  setLoadingEditId(c.id);
+                                  try {
+                                    const res = await getConsumableById(c.id);
+                                    setSelected(res.data ?? c);
+                                  } catch {
+                                    setSelected(c);
+                                  } finally {
+                                    setLoadingEditId(null);
+                                  }
+                                  setView("form");
+                                }}
                               >
-                                <Trash2 className="mr-2 h-4 w-4" /> {t("action.delete")}
+                                <Pencil className="mr-2 h-4 w-4" /> {t("action.edit")}
                               </DropdownMenuItem>
+                            </CanAccess>
+                            {c.is_delete ? (
+                              <CanAccess permission="suppression_consomptible">
+                                <DropdownMenuItem onClick={() => restoreMutation.mutate(c.id)}>
+                                  <RotateCcw className="mr-2 h-4 w-4" /> {t("action.restore")}
+                                </DropdownMenuItem>
+                              </CanAccess>
+                            ) : (
+                              <CanAccess permission="suppression_consomptible">
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteTarget(c)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> {t("action.delete")}
+                                </DropdownMenuItem>
+                              </CanAccess>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>

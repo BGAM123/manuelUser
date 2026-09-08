@@ -26,13 +26,18 @@ import {
   ChevronDown,
   Bell,
   ScrollText,
+  PanelLeftClose,
+  PanelLeftOpen,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/utils/utils";
 import { useT, useI18n, type Key } from "@/utils/i18n";
 import { logoutApi } from "@/api/authentication/auth.api";
 import { useConnectedUser } from "@/hooks/useConnectedUser";
+import { useCanAccess } from "@/hooks/useCanAccess";
+import { TOP_NAV_PERMISSIONS, ADMIN_ITEM_PERMISSIONS } from "@/utils/navPermissions";
 import { NotificationsBell } from "./NotificationsBell";
+import { prefetchRoute } from "@/utils/routePrefetch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -144,13 +149,35 @@ function LanguageSwitcher({ className }: { className?: string }) {
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({
+  onNavigate,
+  onCollapse,
+}: {
+  onNavigate?: () => void;
+  onCollapse?: () => void;
+}) {
   const t = useT();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useLocation().pathname;
   const [searchParams] = useSearchParams();
   const { fullName, serviceName, avatarInitials } = useConnectedUser();
+
+  // RBAC — filtre le menu selon les permissions réelles du rôle connecté
+  // (voir navPermissions.ts et useCanAccess pour le filet de sécurité admin
+  // / chargement / rôle sans permission).
+  const { canAny, isUnfiltered } = useCanAccess();
+
+  const visibleAdminGroups = adminGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => canAny(ADMIN_ITEM_PERMISSIONS[item.key] ?? [])) }))
+    .filter((group) => group.items.length > 0);
+  const visibleAdminStandaloneItems = adminStandaloneItems.filter((item) =>
+    canAny(ADMIN_ITEM_PERMISSIONS[item.key] ?? []),
+  );
+  const configVisible = isUnfiltered || visibleAdminGroups.length > 0 || visibleAdminStandaloneItems.length > 0;
+  const visibleNavItems = navItems.filter((item) =>
+    item.to === "/configuration" ? configVisible : canAny([...(TOP_NAV_PERMISSIONS[item.to] ?? [])]),
+  );
 
   const isActive = (matches: readonly string[]) =>
     matches.some((m) => pathname === m || pathname.startsWith(m + "/"));
@@ -166,7 +193,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     return !item.tab;
   };
 
-  const activeGroupId = adminGroups.find((g) => g.items.some(isItemActive))?.id ?? null;
+  const activeGroupId = visibleAdminGroups.find((g) => g.items.some(isItemActive))?.id ?? null;
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const s = new Set<string>();
@@ -211,7 +238,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo / marque */}
       <div className="flex flex-col items-center gap-2 border-b border-border px-4 py-5">
         <div className="flex w-full items-start justify-between">
-          <div className="w-9" />
+          {onCollapse ? (
+            <button
+              type="button"
+              onClick={onCollapse}
+              aria-label={t("nav.collapseSidebar")}
+              title={t("nav.collapseSidebar")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+            >
+              <PanelLeftClose className="h-5 w-5" />
+            </button>
+          ) : (
+            <div className="w-9" />
+          )}
           <Link
             to="/statistiques"
             onClick={onNavigate}
@@ -236,7 +275,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.matches);
           const label = t(item.labelKey);
@@ -247,6 +286,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <Link
                 to={item.to}
                 onClick={onNavigate}
+                onMouseEnter={() => prefetchRoute(item.to)}
+                onFocus={() => prefetchRoute(item.to)}
                 className={cn(
                   "group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all",
                   active
@@ -270,7 +311,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               {/* Sous-menus Administration — accordéons + liens directs */}
               {isAdmin && adminActive && (
                 <div className="mt-1 flex flex-col gap-0.5 pl-2 pr-1">
-                  {adminGroups.map((group) => {
+                  {visibleAdminGroups.map((group) => {
                     const GroupIcon = group.icon;
                     const isOpen = openGroups.has(group.id);
                     const groupHasActive = group.items.some(isItemActive);
@@ -334,7 +375,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   })}
 
                   {/* Liens directs (sans accordéon) */}
-                  {adminStandaloneItems.map((item) => {
+                  {visibleAdminStandaloneItems.map((item) => {
                     const ItemIcon = item.icon;
                     const itemActive = item.key === activeSection;
                     return (
@@ -426,16 +467,33 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useT();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Sidebar repliable (desktop) — le choix est mémorisé d'une page à l'autre
+  // et d'une session à l'autre. Quand elle est masquée, le contenu occupe
+  // toute la largeur disponible.
+  const [collapsed, setCollapsed] = useState<boolean>(
+    () => localStorage.getItem("minepia_sidebar_collapsed") === "1",
+  );
+
+  useEffect(() => {
+    localStorage.setItem("minepia_sidebar_collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
       {/* ── Sidebar gauche fixe (desktop ≥ lg) ───────────────── */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-64 xl:w-72 lg:flex-col border-r border-border shadow-sm overflow-y-auto">
-        <SidebarContent />
-      </aside>
+      {!collapsed && (
+        <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-64 xl:w-72 lg:flex-col border-r border-border shadow-sm overflow-y-auto">
+          <SidebarContent onCollapse={() => setCollapsed(true)} />
+        </aside>
+      )}
 
-      {/* ── Zone principale (marges gauche = largeur sidebar) ─── */}
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-64 xl:pl-72">
+      {/* ── Zone principale (marge gauche = largeur sidebar) ─── */}
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          !collapsed && "lg:pl-64 xl:pl-72",
+        )}
+      >
         {/* Barre mobile (hamburger uniquement) */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-white px-4 py-3 lg:hidden">
           <Link to="/statistiques" className="flex items-center gap-2">
@@ -459,6 +517,34 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </header>
+
+        {/* Barre desktop de réaffichage de la sidebar (visible seulement
+            lorsqu'elle est masquée) */}
+        {collapsed && (
+          <div className="sticky top-0 z-30 hidden items-center gap-2 border-b border-border bg-white px-4 py-2 lg:flex">
+            <button
+              type="button"
+              aria-label={t("nav.expandSidebar")}
+              title={t("nav.expandSidebar")}
+              onClick={() => setCollapsed(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-foreground/70 hover:bg-muted"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </button>
+            <Link to="/statistiques" className="flex items-center gap-2">
+              <img
+                src="/minepia-logo.png"
+                alt="MINEPIA"
+                className="h-7 w-7 rounded-full border border-border bg-white object-contain p-0.5"
+              />
+              <span className="text-sm font-extrabold text-primary">MINEPIA</span>
+            </Link>
+            <div className="ml-auto flex items-center gap-2">
+              <LanguageSwitcher />
+              <NotificationsBell />
+            </div>
+          </div>
+        )}
 
         {/* Contenu page — pas de largeur maximale fixe : sur les très grands
             écrans (ultrawide, incurvés), le contenu doit occuper tout

@@ -1,13 +1,13 @@
     import React, { useMemo, useState, useEffect, useCallback, useRef, lazy, Suspense, type ReactNode } from "react";
 
 import {
-  Plus, Search, Download, MoreVertical, ChevronLeft, ChevronRight,
+  Plus, Search, Download, MoreVertical,
   Columns as ColumnsIcon, ArrowRightLeft, Printer, FileCheck2, X,
   Pencil, DoorOpen, Trash2, Upload, Eye, User as UserIcon, ArrowLeft,
   ChevronDown, Package, Calendar as CalendarIcon, ClipboardList, Loader2 as Loader2Icon,
   FileSpreadsheet, FileText, ExternalLink, Map as MapIcon, QrCode, ShieldCheck,
   TrendingDown,
-  Wrench, Lock, LockOpen, CheckCircle2, PackageCheck, Undo2,
+  Wrench, Lock, CheckCircle2, PackageCheck, Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -46,8 +46,11 @@ import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { OrgTreeSelect as PosteOrgSelect, formatPosteLabel } from "@/components/shared/OrgTreeSelect";
 import { CartographieTreeSelect } from "@/components/shared/CartographieTreeSelect";
 import { OrgTreeMultiSelect } from "@/components/shared/OrgTreeMultiSelect";
+import { Pagination } from "@/components/shared/Pagination";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useConnectedUser } from "@/hooks/useConnectedUser";
+import { CanAccess } from "@/components/auth/CanAccess";
+import { useCanAccess } from "@/hooks/useCanAccess";
 import { listAssetAssignmentsPage } from "@/api/biens/asset-assignments-list.api";
 import { SearchableMultiSelect } from "@/components/shared/SearchableMultiSelect";
 import { RemoteSearchSelect } from "@/components/shared/RemoteSearchSelect";
@@ -64,7 +67,7 @@ import {
 import { useMutation, useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useT, type Key } from "@/utils/i18n";
 import { useNavigate } from "react-router-dom";
-import { formatFCFA } from "@/api/common";
+import { formatFCFA, formatAmount } from "@/api/common";
 import {
   createBien, listBiens, listBiensPage, updateBien, deleteBien, softDeleteBien, getBienById,
   getAssetMercuriale, patchBienEtat,
@@ -132,12 +135,13 @@ function MapLoadingFallback({ height = 300 }: { height?: number }) {
 }
 
 // Normalise la valeur brute du statut renvoyée par l'API — le backend
-// renvoie tantôt "SORTIS" tantôt "SORTIE" selon l'origine de l'enregistrement ;
-// on unifie toujours vers "SORTIE". Reste au format brut (snake_case) attendu
-// par l'API pour les comparaisons/filtres — voir displayStatut() pour l'affichage.
+// renvoie tantôt "SORTIS" tantôt "SORTIE" (ancienne orthographe conservée sur
+// certains anciens enregistrements) ; on unifie toujours vers "SORTIS". Reste
+// au format brut (snake_case) attendu par l'API pour les comparaisons/filtres
+// — voir displayStatut() pour l'affichage.
 function normalizeStatut(statut?: string | null): string {
   if (!statut) return "";
-  return statut === "SORTIS" ? "SORTIE" : statut;
+  return statut === "SORTIE" ? "SORTIS" : statut;
 }
 
 // Libellé lisible d'un statut — convertit le snake_case de l'API
@@ -153,14 +157,6 @@ function displayStatut(statut?: string | null): string {
 
   type Piece = { file: File; libelle: string };
 
-  type AffectationBspData = {
-    quantiteDemandee?: string;
-    quantiteAccordee?: string;
-    quantiteServie?: string;
-    dateBsp?: string;
-    observations?: string;
-  };
-
   type AffectationSubmitPayload = {
     service_id?: number;
     user_id?: number;
@@ -168,9 +164,6 @@ function displayStatut(statut?: string | null): string {
     dateFin?: string;
     commentaire?: string;
     typeAffectation?: string;
-    methodConso?: string;
-    transferPieces?: Array<{ file: File; nom: string }>;
-    bspData?: AffectationBspData;
   };
 
   /* =========================================================
@@ -251,9 +244,12 @@ function displayStatut(statut?: string | null): string {
     etat_bien_id: number | null;
     service_id: number | null;
     user_id: number | null;   // peut être combiné à service_id — les deux sont envoyés au backend
-    // Utilisateur de restitution par défaut pour ce bien (préremplissage
-    // côté GET via userRestitution) — indépendant de user_id.
-    user_restitution_id: number | null;
+    // Service de restitution par défaut pour ce bien (préremplissage côté
+    // GET via serviceRestitution) — indépendant de user_id/service_id. Le
+    // backend n'accepte plus un utilisateur pour ce champ (confirmé sur
+    // POST/PUT /assets et /assets/{id}/restituer, 2026-09-01).
+    service_restitution_id: number | null;
+    service_restitution_nom: string;
     service_nom: string; // affiché dans le popover Structure
     matricule_nom: string; // affiché dans le popover Matricule
     category_nom: string;
@@ -292,6 +288,10 @@ function displayStatut(statut?: string | null): string {
     // coché (même mécanisme que SecurisationDialog) — le champ securityMode
     // de POST /assets ne supporte qu'une seule valeur, insuffisant ici.
     securityModes: Set<SecurityMode>;
+    // Pièces justificatives de sécurisation — obligatoires dès qu'au moins
+    // un mode de sécurisation est coché (même mécanisme que SecurisationDialog :
+    // envoyées via POST /securities, piecesJointes[]/piecesJointesNoms[]).
+    securityPieces: Array<{ file: File; nom: string }>;
   };
 
   const emptyForm: BienFormState = {
@@ -303,7 +303,7 @@ function displayStatut(statut?: string | null): string {
     fournisseurNom: "", fournisseurEmail: "", fournisseurTelephone: "",
     fournisseurAdresse: "", fournisseurVille: "", fournisseurPays: "Cameroun",
     category_id: null, asset_type_id: null, asset_sub_type_id: null, etat_bien_id: null,
-    service_id: null, user_id: null, user_restitution_id: null, service_nom: "", matricule_nom: "",
+    service_id: null, user_id: null, service_restitution_id: null, service_restitution_nom: "", service_nom: "", matricule_nom: "",
     category_nom: "",
     asset_type_nom: "",
     asset_sub_type_nom: "",
@@ -320,12 +320,13 @@ function displayStatut(statut?: string | null): string {
     activeDepreciation: true,
     activeAmortissement: true,
     securityModes: new Set<SecurityMode>(),
+    securityPieces: [],
   };
 
   // const sourcesFinancement = ["Budget Etat", "Ressources propres", "Partenaires", "BIP", "Don"];
   // const modesAcquisition = ["Achat", "Don", "Legs", "Transfert", "Fabrication interne"];
   const typesFournisseur = ["ENTREPRISE", "INDIVIDU", "ONG", "ADMINISTRATION"];
-  const statutsBien = ["ACTIF", "SORTIE", "EN_MAINTENANCE", "INACTIF"];
+  const statutsBien = ["ACTIF", "SORTIS", "EN_MAINTENANCE", "INACTIF"];
 
   /* =========================================================
     buildBienPayload — convertit BienFormState → CreateBienPayload
@@ -367,7 +368,7 @@ function displayStatut(statut?: string | null): string {
       etat_bien_id: form.etat_bien_id ?? undefined,
       service_id: form.service_id ?? 0,
       user_id: form.user_id ?? undefined,
-      user_restitution_id: form.user_restitution_id ?? undefined,
+      service_restitution_id: form.service_restitution_id ?? undefined,
       project_ids: form.project_ids.length > 0 ? form.project_ids : undefined,
       // Localisation (Terrains/Bâtiments) — envoyée avec le reste du bien,
       // dans la même requête (voir buildFormData).
@@ -402,10 +403,8 @@ function displayStatut(statut?: string | null): string {
       render: (b, labels) => (
         <span className="inline-flex items-center gap-1.5">
           <span className="font-medium">{b.nom}</span>
-          {b.securise ? (
+          {b.securise && (
             <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label={labels?.secured ?? "Sécurisé"} />
-          ) : (
-            <LockOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label={labels?.notSecured ?? "Non sécurisé"} />
           )}
         </span>
       ),
@@ -432,7 +431,7 @@ function displayStatut(statut?: string | null): string {
     { key: "exercice", label: "Exercice", render: (b) => b.exercice || "—" },
     {
       key: "valeur", label: "Valeur (FCFA)",
-      render: (b) => <span className="tabular-nums">{formatFCFA(b.valeur)}</span>,
+      render: (b) => <span className="tabular-nums">{formatAmount(b.valeur)}</span>,
       className: "text-right",
     },
     { key: "dateAcquisition", label: "Date d'acquisition", render: (b) => b.dateAcquisition },
@@ -624,9 +623,9 @@ function displayStatut(statut?: string | null): string {
     const createBienMutation = useMutation<
       ApiBien,
       unknown,
-      { payload: CreateBienPayload; preview?: Partial<ApiBien>; locationFile?: File; securityModes?: Set<SecurityMode> }
+      { payload: CreateBienPayload; preview?: Partial<ApiBien>; locationFile?: File; securityModes?: Set<SecurityMode>; securityPieces?: Array<{ file: File; nom: string }> }
     >({
-      mutationFn: async ({ payload, locationFile, securityModes }) => {
+      mutationFn: async ({ payload, locationFile, securityModes, securityPieces }) => {
         const created = await createBien(payload);
         if (locationFile) {
           try {
@@ -643,7 +642,13 @@ function displayStatut(statut?: string | null): string {
           const today = new Date().toISOString().slice(0, 10);
           for (const mode of securityModes) {
             try {
-              await createSecurity({ asset_ids: [created.id], security_mode: mode, date_securisation: today });
+              await createSecurity({
+                asset_ids: [created.id],
+                security_mode: mode,
+                date_securisation: today,
+                piecesJointes: securityPieces && securityPieces.length > 0 ? securityPieces.map((p) => p.file) : undefined,
+                piecesJointesNoms: securityPieces && securityPieces.length > 0 ? securityPieces.map((p) => p.nom) : undefined,
+              });
             } catch (err) {
               const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
               toast.error(msg ?? t("biens.error.securityFailed", { mode }), { duration: 8000 });
@@ -883,7 +888,7 @@ function displayStatut(statut?: string | null): string {
               if (formMode === "edit" && current) {
                 updateBienMutation.mutate({ id: current.id, payload, preview, locationFile });
               } else {
-                createBienMutation.mutate({ payload, preview, locationFile, securityModes: formState.securityModes });
+                createBienMutation.mutate({ payload, preview, locationFile, securityModes: formState.securityModes, securityPieces: formState.securityPieces });
               }
             }}
           />
@@ -1316,7 +1321,12 @@ function displayStatut(statut?: string | null): string {
     doc.setTextColor(100);
     doc.text(`MINEPIA - ${t("biens.print.generatedOn")} ${new Date().toLocaleDateString("fr-FR")}${b.reference ? ` — ${t("biens.list.col.reference")} : ${b.reference}` : ""}`, 14, cursorY);
 
-    const addTable = (title: string, head: string[], body: Array<Array<string | number>>) => {
+    const addTable = (
+      title: string,
+      head: string[],
+      body: Array<Array<string | number>>,
+      options?: { rowFillColor?: (rowIndex: number) => [number, number, number] | undefined },
+    ) => {
       cursorY += 8;
       doc.setFontSize(11);
       doc.setTextColor(22, 101, 52);
@@ -1330,6 +1340,13 @@ function displayStatut(statut?: string | null): string {
         headStyles: { fillColor: [22, 101, 52], textColor: 255 },
         margin: { top: MINEPIA_PDF_HEADER_HEIGHT + 4, left: 14, right: 14 },
         didDrawPage: () => { renderHeader(); },
+        didParseCell: options?.rowFillColor
+          ? (data) => {
+              if (data.section !== "body") return;
+              const color = options.rowFillColor?.(data.row.index);
+              if (color) data.cell.styles.fillColor = color;
+            }
+          : undefined,
       });
       cursorY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY + 10;
     };
@@ -1347,15 +1364,27 @@ function displayStatut(statut?: string | null): string {
       [t("biens.field.valeur"), formatFCFA(b.valeur)],
       [t("biens.list.col.sourceFinancement"), b.sourceFinancement ?? b.projects?.[0]?.nom ?? "—"],
       [t("biens.detail.fournisseur"), b.fournisseurNom || "—"],
+      [t("biens.detail.field.coutMaintenance"), b.coutTotalMaintenance != null ? formatFCFA(Number(b.coutTotalMaintenance)) : "—"],
     ]);
     addTable(t("biens.detail.tab.affectations"), [t("biens.print.debut"), t("biens.print.fin"), t("biens.detail.col.structure"), t("biens.detail.col.type"), t("biens.detail.col.responsable")], affectations.map((item) => [
       item.dateDebut || "—", item.dateFin || "—", item.service?.nom || "—", item.typeAffectation || "—",
       item.utilisateur ? `${item.utilisateur.firstName} ${item.utilisateur.lastName}` : "—",
-    ]));
+    ]), {
+      // Détenteur actuel (première ligne) surligné en vert, comme à l'écran
+      // (bg-green-50 — voir EventTable/highlightFirstRow).
+      rowFillColor: (rowIndex) => (affectations.length > 0 && rowIndex === 0 ? [240, 253, 244] : undefined),
+    });
     addTable(t("biens.block.maintenance"), [t("biens.print.intervention"), t("biens.detail.col.recuperation"), t("biens.detail.field.etat"), t("biens.print.cout"), t("biens.detail.col.motif")], maintenances.map((item) => [
       item.dateIntervention || "—", item.dateRecuperation || "—", item.etatBien?.nom ?? item.etat ?? "—",
       formatFCFA(item.cout ?? 0), item.motif || "—",
-    ]));
+    ]), {
+      // Maintenance dont le coût dépasse la valeur du bien surlignée en rouge,
+      // comme à l'écran (bg-red-100 — voir EventTable rowClassName).
+      rowFillColor: (rowIndex) => (maintenances[rowIndex]?.cout != null && maintenances[rowIndex].cout > b.valeur ? [254, 226, 226] : undefined),
+    });
+    addTable(t("biens.detail.valeurActuelle"), [t("biens.field.valeur"), t("biens.detail.valeurActuelle")], [
+      [formatFCFA(b.valeur), b.amortissement?.valeurActuelle != null ? formatFCFA(b.amortissement.valeurActuelle) : "—"],
+    ]);
     addTable(t("biens.detail.tab.reevaluations"), [t("common.date"), t("biens.print.ancienneValeur"), t("biens.print.nouvelleValeur"), t("biens.detail.col.methode"), t("biens.detail.col.motif")], reevals.map((item) => [
       item.dateReevaluation || "—", formatFCFA(item.valeurActuelle ?? 0), formatFCFA(item.nouvelleValeur),
       item.methodeEvaluation || "—", item.motif || "—",
@@ -1454,6 +1483,7 @@ function displayStatut(statut?: string | null): string {
       { [t("biens.print.champ")]: t("biens.field.valeur"), [t("biens.print.valeur")]: b.valeur },
       { [t("biens.print.champ")]: t("biens.list.col.sourceFinancement"), [t("biens.print.valeur")]: b.sourceFinancement ?? b.projects?.[0]?.nom ?? "—" },
       { [t("biens.print.champ")]: t("biens.detail.fournisseur"), [t("biens.print.valeur")]: b.fournisseurNom || "—" },
+      { [t("biens.print.champ")]: t("biens.detail.field.coutMaintenance"), [t("biens.print.valeur")]: b.coutTotalMaintenance ?? 0 },
     ]);
     appendSheet(t("biens.detail.tab.affectations"), affectations.map((item) => ({
       [t("biens.print.debut")]: item.dateDebut || "—", [t("biens.print.fin")]: item.dateFin || "—", [t("biens.detail.col.structure")]: item.service?.nom || "—",
@@ -1482,13 +1512,12 @@ function displayStatut(statut?: string | null): string {
 // Le champ statut stocké côté backend ne correspond pas toujours au libellé
 // affiché/normalisé côté app (voir normalizeStatut) — confirmé en lisant
 // AssetRepository/AssetExitService/AssetMaintenanceService directement :
-// la vraie valeur stockée est "SORTIS" (pas "SORTIE") et "EN MAINTENANCE"
-// (avec un espace, pas un underscore). Le filtre serveur fait une comparaison
-// exacte (statut = :statut) — envoyer la valeur affichée telle quelle ne
-// matcherait jamais rien pour ces deux cas.
+// "EN MAINTENANCE" est stocké avec un espace, pas un underscore. Le filtre
+// serveur fait une comparaison exacte (statut = :statut) — envoyer la valeur
+// affichée telle quelle ne matcherait jamais rien pour ce cas.
 const STATUT_TO_API: Record<string, string> = {
   ACTIF: "ACTIF",
-  SORTIE: "SORTIS",
+  SORTIS: "SORTIS",
   EN_MAINTENANCE: "EN MAINTENANCE",
   INACTIF: "INACTIF",
 };
@@ -1527,10 +1556,12 @@ function BiensList({
   const [fEtatBien, setFEtatBien] = useState("all");
   const [fSecurise, setFSecurise] = useState<"all" | "true" | "false">("all");
   const [fReceived, setFReceived] = useState<"all" | "true" | "false">("all");
+  const [fRestituable, setFRestituable] = useState<"all" | "true" | "false">("all");
   const [fServiceIds, setFServiceIds] = useState<number[]>([]);
   const [fProjectIds, setFProjectIds] = useState<number[]>([]);
   const [visible, setVisible] = useState<ColKey[]>(defaultVisible);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [inventaireOpen, setInventaireOpen] = useState(false);
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const navigate = useNavigate();
@@ -1542,6 +1573,16 @@ function BiensList({
   // Bien ciblé par la restitution (POST /assets/{id}/restituer) — null = dialog fermée.
   const [restitutionTarget, setRestitutionTarget] = useState<ApiBien | null>(null);
   const [isPrintingSelected, setIsPrintingSelected] = useState(false);
+  // Affichage mobile/tablette (< lg) — lignes dépliées pour voir les colonnes
+  // masquées par défaut (recommandation tableaux responsives).
+  const [expandedRowIds, setExpandedRowIds] = useState<Set<number>>(new Set());
+  const toggleRowExpanded = (id: number) => {
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Recommandation 90 — fiche détenteur (biens actuellement affectés à un utilisateur).
   // bien = le bien depuis lequel le popup a été ouvert (contextBien) — on sait déjà
@@ -1566,7 +1607,6 @@ function BiensList({
       toast.error(t("biens.error.detenteurFetchFailed"));
     }
   };
-  const pageSize = 10;
 
   // Catégories disponibles pour le dialog d'inventaire
   const { data: catsInv } = useQuery({
@@ -1586,7 +1626,10 @@ function BiensList({
     queryFn: () => listProjects({ limit: 200 }),
     staleTime: 300_000,
   });
-  const projectFilterOptions = (projectsForFilter?.data ?? []).map((p) => ({ value: p.id, label: p.nom }));
+  const projectFilterOptions = (projectsForFilter?.data ?? []).map((p) => ({
+    value: p.id,
+    label: p.exercice ? `${p.nom} - ${p.exercice}` : p.nom,
+  }));
 
   // ── Pagination + filtres côté SERVEUR (GET /assets) ────────────────────────
   // Remplace l'ancien filtrage 100% client sur un lot fixe de 200 biens, qui
@@ -1598,6 +1641,7 @@ function BiensList({
   const statutForFilter = fStatut !== "all" ? (STATUT_TO_API[fStatut] ?? fStatut) : undefined;
   const securiseForFilter = fSecurise !== "all" ? fSecurise === "true" : undefined;
   const receivedForFilter = fReceived !== "all" ? fReceived === "true" : undefined;
+  const restituableForFilter = fRestituable !== "all" ? fRestituable === "true" : undefined;
   const serviceIdForFilter = fServiceIds.length > 0 ? fServiceIds.join(",") : undefined;
   const projectIdForFilter = fProjectIds.length > 0 ? fProjectIds.join(",") : undefined;
 
@@ -1627,6 +1671,7 @@ function BiensList({
       statutForFilter,
       securiseForFilter,
       receivedForFilter,
+      restituableForFilter,
       serviceIdForFilter,
       projectIdForFilter,
       hasEtatFilter,
@@ -1640,6 +1685,7 @@ function BiensList({
         statut: statutForFilter,
         securise: securiseForFilter,
         received: receivedForFilter,
+        restituable: restituableForFilter,
         service_id: serviceIdForFilter,
         project_id: projectIdForFilter,
       }),
@@ -1731,6 +1777,11 @@ function BiensList({
   // GET /securities + recherche dans assets[] de chaque enregistrement).
   const selectedBiens = useMemo(() => data.filter((b) => new Set(selectedIds).has(b.id)), [data, selectedIds]);
   const hasNotReceivedSelected = selectedBiens.some(isBienNotReceived);
+  // Le bouton d'accusé de réception groupé ne doit être actif que si TOUS les
+  // biens sélectionnés sont non accusés (et, pour un admin, affectés à son
+  // propre service) — sinon il reste grisé pour éviter d'accuser réception
+  // partiellement sur une sélection mixte (services/statuts différents).
+  const allNotReceivedSelected = selectedBiens.length > 0 && selectedBiens.every(isBienNotReceived);
   const hasAlreadySecurised = selectedBiens.some((b) => b.securise) || hasNotReceivedSelected;
   const securiserTooltip = hasNotReceivedSelected
     ? t("biens.tooltip.acknowledgeBeforeSecure")
@@ -1787,6 +1838,16 @@ function BiensList({
       let successCount = 0;
       for (const b of biens) {
         try {
+          // Un admin ne peut accuser réception que des biens affectés à son
+          // propre poste (service) — même règle que isBienNotReceived pour
+          // le surlignage des lignes, mais appliquée ici à l'action réelle :
+          // sans ce garde-fou, le bouton groupé permettait à un admin
+          // d'accuser réception de n'importe quel bien du patrimoine, ce qui
+          // n'a pas de sens (demande explicite 2026-08-31).
+          if (isAdmin && b.service?.id !== ownServiceId) {
+            errors.push(`${b.nom} : ${t("biens.error.notOwnService")}`);
+            continue;
+          }
           const affectations = await listAffectations(b.id);
           const current = [...affectations].sort((x, y) => (y.dateDebut || "").localeCompare(x.dateDebut || ""))[0];
           if (!current) { errors.push(`${b.nom} : ${t("biens.error.noAffectation")}`); continue; }
@@ -1834,14 +1895,27 @@ function BiensList({
       return {
         ...c,
         render: (b: ApiBien) => (
-          <span className="inline-flex items-center gap-1.5">
-            {c.render(b, { secured: t("biens.secure.secured"), notSecured: t("biens.secure.notSecured") })}
-            {/* Uniquement une confirmation positive (accusé effectué) —
-                pas d'indicateur pour "non accusé", qui concernerait la
-                quasi-totalité des lignes (affectation initiale à la
-                création) et n'apporterait donc aucune information utile. */}
-            {b.received === true && (
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label={t("biens.list.receptionAcknowledged")} />
+          <span className="flex flex-col gap-0.5">
+            <span className="inline-flex items-center gap-1.5">
+              {c.render(b, { secured: t("biens.secure.secured"), notSecured: t("biens.secure.notSecured") })}
+              {/* Uniquement une confirmation positive (accusé effectué) —
+                  pas d'indicateur pour "non accusé", qui concernerait la
+                  quasi-totalité des lignes (affectation initiale à la
+                  création) et n'apporterait donc aucune information utile. */}
+              {b.received === true && (
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label={t("biens.list.receptionAcknowledged")} />
+              )}
+            </span>
+            {/* Note "restitué" — mêmes champs que l'onglet Affectations du
+                détail (bien.isRestitue), affichée sous la désignation comme
+                les autres badges. L'indicateur "À restituer" (doitEtreRestitue)
+                a été retiré (2026-09-04) suite à la suppression du champ
+                "service de restitution" du formulaire — sera réintégré plus
+                tard selon les travaux backend en cours. */}
+            {b.isRestitue === true && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600">
+                <Undo2 className="h-3 w-3 shrink-0" /> {t("biens.detail.restitue")}
+              </span>
             )}
           </span>
         ),
@@ -1860,6 +1934,10 @@ function BiensList({
           ? etatBiens.filter((e) => allowedIds.has(e.id) || e.id === b.etatBien?.id)
           : etatBiens;
         return (
+          <CanAccess
+            permission="modifier_etat_bien"
+            fallback={<span className="text-xs text-green-700">{b.etatBien?.nom ?? "—"}</span>}
+          >
           <Select
             value={b.etatBien?.id ? String(b.etatBien.id) : ""}
             onValueChange={(v) => {
@@ -1926,6 +2004,7 @@ function BiensList({
               })}
             </SelectContent>
           </Select>
+          </CanAccess>
         );
       },
     };
@@ -1942,7 +2021,6 @@ function BiensList({
       else onSelectionChange(Array.from(new Set([...selectedIds, ...ids])));
     };
 
-    const pageNumbers = pageList(currentPage, totalPages);
     const exportColumns: ExportColumn<ApiBien>[] = dynamicColumns
       .filter((column) => visible.includes(column.key))
       .map((column) => ({
@@ -2030,6 +2108,102 @@ function BiensList({
       printWindow.document.close();
     };
 
+    // Menu d'actions par ligne — factorisé pour être réutilisé à la fois
+    // dans la colonne d'actions du tableau (desktop) et dans le bloc actions
+    // en bas de chaque carte (affichage mobile/tablette < lg).
+    const renderRowActions = (b: ApiBien, isSortie: boolean, isNotReceived: boolean) => {
+      if (isSortie) {
+        return <span className="text-xs italic text-muted-foreground" title={t("biens.list.noActionsSortie")}>—</span>;
+      }
+      if (isNotReceived) {
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" aria-label={t("common.actions")}>
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <CanAccess permission="voir_fiche_bien">
+                <DropdownMenuItem onSelect={() => onOpen(b)}><Eye className="mr-2 h-4 w-4" /> {t("biens.list.viewFiche")}</DropdownMenuItem>
+              </CanAccess>
+              <CanAccess permission="accuser_reception_bien">
+                <DropdownMenuItem
+                  disabled={acknowledgeMutation.isPending}
+                  onSelect={() => acknowledgeMutation.mutate([b])}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> {t("biens.list.receptionAcknowledged")}
+                </DropdownMenuItem>
+              </CanAccess>
+              <CanAccess permission="imprimer_bordereau">
+                <DropdownMenuItem onSelect={() => printBordereau([b])}><FileText className="mr-2 h-4 w-4" /> {t("biens.print.printBordereau")}</DropdownMenuItem>
+              </CanAccess>
+              <CanAccess permission="imprimer_fiche_bien">
+                <DropdownMenuItem onSelect={() => onPrint(b)}><Printer className="mr-2 h-4 w-4" /> {t("biens.print.printFiche")}</DropdownMenuItem>
+              </CanAccess>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" aria-label={t("common.actions")}>
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <CanAccess permission="voir_fiche_bien">
+              <DropdownMenuItem onSelect={() => onOpen(b)}><Eye className="mr-2 h-4 w-4" /> {t("biens.list.viewFiche")}</DropdownMenuItem>
+            </CanAccess>
+            <CanAccess permission="modifier_bien">
+              <DropdownMenuItem onSelect={() => onEdit(b)}><Pencil className="mr-2 h-4 w-4" /> {t("action.edit")}</DropdownMenuItem>
+            </CanAccess>
+            <CanAccess permission="sortir_bien">
+              <DropdownMenuItem onSelect={() => onSortir(b)}><DoorOpen className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">{t("biens.list.exitAsset")}</span></DropdownMenuItem>
+            </CanAccess>
+            <CanAccess permission="voir_fiche_detenteur">
+              <DropdownMenuItem onSelect={() => openDetenteur(b)}>
+                <UserIcon className="mr-2 h-4 w-4" /> {t("biens.list.detenteurFiche")}
+              </DropdownMenuItem>
+            </CanAccess>
+            <CanAccess permission="restitution_bien">
+              <DropdownMenuItem onSelect={() => setRestitutionTarget(b)}>
+                <Undo2 className="mr-2 h-4 w-4" /> {t("biens.list.restituer")}
+              </DropdownMenuItem>
+            </CanAccess>
+            <CanAccess permission="imprimer_fiche_bien">
+              <DropdownMenuItem onSelect={() => onPrint(b)}><Printer className="mr-2 h-4 w-4" /> {t("biens.print.printFiche")}</DropdownMenuItem>
+            </CanAccess>
+            <CanAccess permission="consulter_mercuriale">
+              <DropdownMenuItem onSelect={() => setMercurialeTarget(b)}><ExternalLink className="mr-2 h-4 w-4" /> {t("biens.list.viewMercuriale")}</DropdownMenuItem>
+            </CanAccess>
+            {/* Recommandation 6 — génération d'un QR code
+                reprenant les détails du bien (référence, nom,
+                catégorie, valeur, structure, etc.). */}
+            <CanAccess permission="generer_qrcode_bien">
+              <DropdownMenuItem onSelect={() => setQrTarget(b)}>
+                <QrCode className="mr-2 h-4 w-4" /> {t("biens.list.qrCode")}
+              </DropdownMenuItem>
+            </CanAccess>
+            <CanAccess permission="supprimer_bien">
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onSelect={() => {
+                toast(t("biens.list.deleteConfirmTitle"), {
+                  description: t("biens.list.deleteConfirmDesc", { nom: b.nom }),
+                  action: { label: t("action.delete"), onClick: () => onDelete(b.id) },
+                  cancel: { label: t("action.cancel"), onClick: () => {} },
+                  duration: 8000,
+                });
+              }}>
+                <Trash2 className="mr-2 h-4 w-4" /> {t("action.delete")}
+              </DropdownMenuItem>
+            </CanAccess>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    };
+
     // ── Sécurisation groupée ────────────────────────────────────────────────
     // Chaque bien a son propre formulaire dans SecurisationDialog (rec. 410),
     // avec sa propre carte affichée ou non selon sa catégorie — plus besoin
@@ -2054,51 +2228,69 @@ function BiensList({
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={onNew} className="h-11 gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="h-4 w-4" /> {t("biens.add")}
-            </Button>
-            <Button variant="outline" className="h-11 gap-2" onClick={() => navigate("/biens/amortissements")}>
-              <TrendingDown className="h-4 w-4" /> {t("biens.amortissement")}
-            </Button>
-            <Button variant="outline" className="h-11 gap-2" onClick={() => navigate("/biens/maintenances-en-cours")}>
-              <Wrench className="h-4 w-4" /> {t("biens.list.needsMaintenance")}
-            </Button>
-            <Button variant="outline" className="h-11 gap-2" onClick={() => setMapDialogOpen(true)}>
-              <MapIcon className="h-4 w-4" /> {t("biens.list.viewOnMap")}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-11 gap-2">
-                  <Download className="h-4 w-4" /> {t("biens.list.exportChoice")}
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>{t("biens.list.exportChoice")}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="gap-2">
-                    <Download className="h-4 w-4" /> {t("biens.list.exportAssets")}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuItem onClick={exportBiensPDF} disabled={exportData.length === 0} className="gap-2">
-                        <FileText className="h-4 w-4" /> PDF
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={exportBiensCSV} disabled={exportData.length === 0} className="gap-2">
-                        <FileSpreadsheet className="h-4 w-4" /> CSV
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={exportBiensXLSX} disabled={exportData.length === 0} className="gap-2">
-                        <FileSpreadsheet className="h-4 w-4" /> Excel
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
-                <DropdownMenuItem onClick={() => setInventaireOpen(true)} className="gap-2">
-                  <ClipboardList className="h-4 w-4" /> {t("biens.list.exportInventories")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <CanAccess permission="creation_bien">
+              <Button onClick={onNew} className="h-11 gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus className="h-4 w-4" /> {t("biens.add")}
+              </Button>
+            </CanAccess>
+            <CanAccess permission="consultation_amortissement">
+              <Button variant="outline" className="h-11 gap-2" onClick={() => navigate("/biens/amortissements")}>
+                <TrendingDown className="h-4 w-4" /> {t("biens.amortissement")}
+              </Button>
+            </CanAccess>
+            <CanAccess permission="consultation_maintenance">
+              <Button variant="outline" className="h-11 gap-2" onClick={() => navigate("/biens/maintenances-en-cours")}>
+                <Wrench className="h-4 w-4" /> {t("biens.list.needsMaintenance")}
+              </Button>
+            </CanAccess>
+            <CanAccess permission="voir_biens_carte">
+              <Button variant="outline" className="h-11 gap-2" onClick={() => setMapDialogOpen(true)}>
+                <MapIcon className="h-4 w-4" /> {t("biens.list.viewOnMap")}
+              </Button>
+            </CanAccess>
+            <CanAccess anyOf={["export_bien", "exporter_excel", "exporter_pdf", "consultation_inventaire", "creation_inventaire"]}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="h-11 gap-2">
+                    <Download className="h-4 w-4" /> {t("biens.list.exportChoice")}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>{t("biens.list.exportChoice")}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <CanAccess anyOf={["export_bien", "exporter_excel", "exporter_pdf"]}>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="gap-2">
+                        <Download className="h-4 w-4" /> {t("biens.list.exportAssets")}
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          <CanAccess permission="exporter_pdf">
+                            <DropdownMenuItem onClick={exportBiensPDF} disabled={exportData.length === 0} className="gap-2">
+                              <FileText className="h-4 w-4" /> PDF
+                            </DropdownMenuItem>
+                          </CanAccess>
+                          <CanAccess permission="exporter_excel">
+                            <DropdownMenuItem onClick={exportBiensCSV} disabled={exportData.length === 0} className="gap-2">
+                              <FileSpreadsheet className="h-4 w-4" /> CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={exportBiensXLSX} disabled={exportData.length === 0} className="gap-2">
+                              <FileSpreadsheet className="h-4 w-4" /> Excel
+                            </DropdownMenuItem>
+                          </CanAccess>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  </CanAccess>
+                  <CanAccess anyOf={["consultation_inventaire", "creation_inventaire"]}>
+                    <DropdownMenuItem onClick={() => setInventaireOpen(true)} className="gap-2">
+                      <ClipboardList className="h-4 w-4" /> {t("biens.list.exportInventories")}
+                    </DropdownMenuItem>
+                  </CanAccess>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CanAccess>
           </div>
         </div>
 
@@ -2208,6 +2400,16 @@ function BiensList({
             { value: "false", label: t("biens.list.filter.notReceived") },
           ]}
         />
+        <FilterSelect
+          label={t("biens.list.filter.restitution")}
+          value={fRestituable}
+          onChange={(v) => { setFRestituable(v as "all" | "true" | "false"); setPage(1); }}
+          options={[
+            { value: "all", label: t("common.all") },
+            { value: "true", label: t("biens.list.filter.restituable") },
+            { value: "false", label: t("biens.list.filter.notRestituable") },
+          ]}
+        />
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs font-medium text-muted-foreground">{t("biens.list.col.serviceActuel")}</Label>
           <OrgTreeMultiSelect
@@ -2215,6 +2417,7 @@ function BiensList({
             onChange={(ids) => { setFServiceIds(ids); setPage(1); }}
             placeholder={t("biens.list.filter.allServices")}
             searchPlaceholder={t("biens.list.filter.searchStructure")}
+            selectableType="Poste"
             deferApply
           />
         </div>
@@ -2265,42 +2468,53 @@ function BiensList({
             {/* <Button size="sm" variant="outline" className="h-9 gap-2" onClick={() => toast.success("Sélection exportée")}>
               <Download className="h-4 w-4" /> Exporter
             </Button> */}
-            <Button size="sm" variant="outline" className="h-9 gap-2" onClick={() => printBordereau()}>
-              <Printer className="h-4 w-4" /> {t("biens.print.bordereau")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-9 gap-2"
-              disabled={isPrintingSelected}
-              onClick={async () => {
-                setIsPrintingSelected(true);
-                try {
-                  await onPrintSelected(selectedBiens);
-                } finally {
-                  setIsPrintingSelected(false);
-                }
-              }}
-            >
-              {isPrintingSelected ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-              {selectedIds.length > 1 ? t("biens.print.printFiches") : t("biens.print.printFiche")}
-            </Button>
-            <Button size="sm" variant="outline" className="h-9 gap-2" onClick={openSecurisation}
-              disabled={hasAlreadySecurised}
-              title={securiserTooltip}
-            >
-              <ShieldCheck className="h-4 w-4" /> {t("biens.list.secure")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-9 gap-2"
-              disabled={acknowledgeMutation.isPending}
-              onClick={() => acknowledgeMutation.mutate(selectedBiens)}
-            >
-              {acknowledgeMutation.isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
-              {t("biens.list.receptionAcknowledged")}
-            </Button>
+            <CanAccess permission="imprimer_bordereau">
+              <Button size="sm" variant="outline" className="h-9 gap-2" onClick={() => printBordereau()}>
+                <Printer className="h-4 w-4" /> {t("biens.print.bordereau")}
+              </Button>
+            </CanAccess>
+            <CanAccess permission="imprimer_fiche_bien">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 gap-2"
+                disabled={isPrintingSelected}
+                onClick={async () => {
+                  setIsPrintingSelected(true);
+                  try {
+                    await onPrintSelected(selectedBiens);
+                  } finally {
+                    setIsPrintingSelected(false);
+                  }
+                }}
+              >
+                {isPrintingSelected ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                {selectedIds.length > 1 ? t("biens.print.printFiches") : t("biens.print.printFiche")}
+              </Button>
+            </CanAccess>
+            <CanAccess permission="modifier_etat_bien">
+              <Button size="sm" variant="outline" className="h-9 gap-2" onClick={openSecurisation}
+                disabled={hasAlreadySecurised}
+                title={securiserTooltip}
+              >
+                <ShieldCheck className="h-4 w-4" /> {t("biens.list.secure")}
+              </Button>
+            </CanAccess>
+            {hasNotReceivedSelected && (
+              <CanAccess permission="accuser_reception_bien">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 gap-2"
+                  disabled={acknowledgeMutation.isPending || !allNotReceivedSelected}
+                  title={!allNotReceivedSelected ? t("biens.tooltip.acknowledgeRequiresAllUnreceived") : undefined}
+                  onClick={() => acknowledgeMutation.mutate(selectedBiens.filter(isBienNotReceived))}
+                >
+                  {acknowledgeMutation.isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
+                  {t("biens.list.receptionAcknowledged")}
+                </Button>
+              </CanAccess>
+            )}
             <button
               type="button"
               onClick={() => onSelectionChange([])}
@@ -2318,7 +2532,7 @@ function BiensList({
               <Loader2Icon className="h-6 w-6 animate-spin text-primary" />
             </div>
           )}
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full min-w-[1100px] text-sm">
               <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
@@ -2368,12 +2582,12 @@ function BiensList({
                   <tr><td colSpan={cols.length + 2} className="px-4 py-12 text-center text-sm text-muted-foreground">{t("biens.list.empty")}</td></tr>
                 ) : paged.map((b, idx) => {
                   const sel = selectedSet.has(b.id);
-                  // Un bien sorti (statut SORTIE — inclut les biens réformés,
+                  // Un bien sorti (statut SORTIS — inclut les biens réformés,
                   // voir ReformeRequestDialog) n'est plus actionnable : toutes
                   // les actions (modifier, sortir, supprimer...) sont masquées.
                   // Ne concerne que la vue filtrée explicitement sur ce statut,
                   // puisque ces biens sont exclus du tableau par défaut.
-                  const isSortie = normalizeStatut(b.statut) === "SORTIE";
+                  const isSortie = normalizeStatut(b.statut) === "SORTIS";
                   // Bien pas encore accusé réception — voir isBienNotReceived
                   // ci-dessus. La case à cocher reste sélectionnable (pas
                   // disabled) : la sélection groupée sert justement à accuser
@@ -2404,66 +2618,7 @@ function BiensList({
                         <td key={c.key} className={cn("px-3 py-3 align-middle", c.className)}>{c.render(b)}</td>
                       ))}
                       <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                        {isSortie ? (
-                          <span className="text-xs italic text-muted-foreground" title={t("biens.list.noActionsSortie")}>—</span>
-                        ) : isNotReceived ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" aria-label={t("common.actions")}>
-                                <MoreVertical className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                              <DropdownMenuItem onSelect={() => onOpen(b)}><Eye className="mr-2 h-4 w-4" /> {t("biens.list.viewFiche")}</DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={acknowledgeMutation.isPending}
-                                onSelect={() => acknowledgeMutation.mutate([b])}
-                              >
-                                <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> {t("biens.list.receptionAcknowledged")}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => printBordereau([b])}><FileText className="mr-2 h-4 w-4" /> {t("biens.print.printBordereau")}</DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => onPrint(b)}><Printer className="mr-2 h-4 w-4" /> {t("biens.print.printFiche")}</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" aria-label={t("common.actions")}>
-                                <MoreVertical className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onSelect={() => onOpen(b)}><Eye className="mr-2 h-4 w-4" /> {t("biens.list.viewFiche")}</DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => onEdit(b)}><Pencil className="mr-2 h-4 w-4" /> {t("action.edit")}</DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => onSortir(b)}><DoorOpen className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">{t("biens.list.exitAsset")}</span></DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => openDetenteur(b)}>
-                                <UserIcon className="mr-2 h-4 w-4" /> {t("biens.list.detenteurFiche")}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => setRestitutionTarget(b)}>
-                                <Undo2 className="mr-2 h-4 w-4" /> {t("biens.list.restituer")}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => onPrint(b)}><Printer className="mr-2 h-4 w-4" /> {t("biens.print.printFiche")}</DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => setMercurialeTarget(b)}><ExternalLink className="mr-2 h-4 w-4" /> {t("biens.list.viewMercuriale")}</DropdownMenuItem>
-                              {/* Recommandation 6 — génération d'un QR code
-                                  reprenant les détails du bien (référence, nom,
-                                  catégorie, valeur, structure, etc.). */}
-                              <DropdownMenuItem onSelect={() => setQrTarget(b)}>
-                                <QrCode className="mr-2 h-4 w-4" /> {t("biens.list.qrCode")}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => {
-                                toast(t("biens.list.deleteConfirmTitle"), {
-                                  description: t("biens.list.deleteConfirmDesc", { nom: b.nom }),
-                                  action: { label: t("action.delete"), onClick: () => onDelete(b.id) },
-                                  cancel: { label: t("action.cancel"), onClick: () => {} },
-                                  duration: 8000,
-                                });
-                              }}>
-                                <Trash2 className="mr-2 h-4 w-4" /> {t("action.delete")}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                        {renderRowActions(b, isSortie, isNotReceived)}
                       </td>
                     </tr>
                   );
@@ -2472,36 +2627,118 @@ function BiensList({
             </table>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              {t("biens.list.count", {
-                count: data.length.toLocaleString("fr-FR"),
-                total: total.toLocaleString("fr-FR"),
+          {/* ── Affichage carte (mobile/tablette < lg) ────────────────────────
+              Seules 3 colonnes (ou plus selon la largeur d'écran, cf. classes
+              "hidden sm:block"/"hidden md:block") sont visibles par défaut ;
+              le bouton chevron déplie le reste en grille. Le clic sur la
+              désignation ("nom") ouvre la fiche, comme sur desktop ; le reste
+              de la carte ne navigue pas. Les boutons d'action sont regroupés
+              en bas de carte (au lieu d'une colonne, cf. demande produit). */}
+          <div className="divide-y divide-border lg:hidden">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="space-y-2 p-3">
+                  <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted" />
+                  <div className="h-3.5 w-1/2 animate-pulse rounded bg-muted" />
+                </div>
+              ))
+            ) : error ? (
+              <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+                <p className="text-sm font-semibold text-destructive">{t("biens.list.loadError")}</p>
+                <p className="max-w-md text-xs text-muted-foreground">{t("biens.list.loadErrorDesc")}</p>
+                {errorMessage && (
+                  <p className="rounded bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">{errorMessage}</p>
+                )}
+              </div>
+            ) : paged.length === 0 ? (
+              <div className="px-4 py-12 text-center text-sm text-muted-foreground">{t("biens.list.empty")}</div>
+            ) : paged.map((b) => {
+                const sel = selectedSet.has(b.id);
+                const isSortie = normalizeStatut(b.statut) === "SORTIS";
+                const isNotReceived = isBienNotReceived(b);
+                const isExpanded = expandedRowIds.has(b.id);
+                const baseCols = cols.slice(0, 3);
+                const extraCols = cols.slice(3);
+                return (
+                  <div
+                    key={b.id}
+                    className={cn(
+                      "p-3",
+                      sel && "bg-primary/5",
+                      isNotReceived && "opacity-60 bg-muted/30",
+                    )}
+                  >
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={sel}
+                        onChange={() => onSelectionChange(sel ? selectedIds.filter((x) => x !== b.id) : [...selectedIds, b.id])}
+                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                        aria-label={t("action.select")}
+                      />
+                      <div className="grid flex-1 grid-cols-3 gap-x-2 gap-y-2 text-xs">
+                        {baseCols.map((c) => (
+                          <div key={c.key} className="min-w-0">
+                            <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{t(columnLabelKeys[c.key])}</div>
+                            {c.key === "nom" ? (
+                              <button
+                                type="button"
+                                onClick={() => onOpen(b)}
+                                className="text-left font-medium text-primary hover:underline"
+                              >
+                                {c.render(b)}
+                              </button>
+                            ) : (
+                              <div className="truncate">{c.render(b)}</div>
+                            )}
+                          </div>
+                        ))}
+                        {extraCols.slice(0, 2).map((c, i) => (
+                          <div key={c.key} className={cn("hidden min-w-0", i === 0 ? "sm:block" : "md:block")}>
+                            <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{t(columnLabelKeys[c.key])}</div>
+                            <div className="truncate">{c.render(b)}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {extraCols.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => toggleRowExpanded(b.id)}
+                          className="mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                          aria-label={isExpanded ? t("action.collapse") : t("action.expand")}
+                          aria-expanded={isExpanded}
+                        >
+                          <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                        </button>
+                      )}
+                    </div>
+
+                    {isExpanded && extraCols.length > 0 && (
+                      <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-2 border-t border-border pt-3 text-xs sm:grid-cols-3">
+                        {extraCols.map((c) => (
+                          <div key={c.key} className="min-w-0">
+                            <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{t(columnLabelKeys[c.key])}</div>
+                            <div className="truncate">{c.render(b)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex items-center justify-end border-t border-border pt-2">
+                      {renderRowActions(b, isSortie, isNotReceived)}
+                    </div>
+                  </div>
+                );
               })}
-            </p>
-            <div className="flex items-center gap-1">
-              <button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground disabled:opacity-40 hover:bg-muted" aria-label={t("biens.list.previous")}>
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              {pageNumbers.map((p, i) =>
-                p === "..." ? (
-                  <span key={`e${i}`} className="px-2 text-xs text-muted-foreground">…</span>
-                ) : (
-                  <button key={p} type="button" onClick={() => setPage(p as number)}
-                    className={cn("inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-xs font-semibold",
-                      p === currentPage ? "bg-primary text-primary-foreground" : "border border-border text-foreground/80 hover:bg-muted"
-                    )}>
-                    {p}
-                  </button>
-                )
-              )}
-              <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground disabled:opacity-40 hover:bg-muted" aria-label={t("biens.list.next")}>
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
           </div>
+
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          />
         </div>
 
       {/* ── Popup de réforme ──────────────────────────────────────────────── */}
@@ -2960,8 +3197,9 @@ function SortieDirectDialog({ bien, onClose, onSaved }: {
   /* ─── RestitutionDialog ──────────────────────────────────────────────────────
     Popup : restitution d'un bien (POST /assets/{id}/restituer). Confirmé en
     lisant AssetAssignmentService::restituerAsset directement (pas juste le
-    Swagger) : seuls user_id (obligatoire), dateDebut, dateFin et commentaire
-    (tous facultatifs) sont acceptés — pas de champ service.
+    Swagger, 2026-09-01) : SEUL service_id (optionnel — si absent, le backend
+    utilise le serviceRestitution déjà défini sur le bien), dateDebut, dateFin
+    et commentaire sont acceptés — user_id n'est PAS/PLUS accepté.
     ──────────────────────────────────────────────────────────────────────────── */
 
   function RestitutionDialog({ bien, isSaving, onClose, onSave }: {
@@ -2971,26 +3209,20 @@ function SortieDirectDialog({ bien, onClose, onSaved }: {
     onSave: (payload: RestituerBienPayload) => void;
   }) {
     const t = useT();
-    const { data: users = [] } = useQuery({
-      queryKey: ["users-all"],
-      queryFn: listAllUsers,
-      staleTime: 5 * 60 * 1000,
-    });
 
-    // Préremplissage — utilisateur de restitution par défaut du bien (userRestitution),
-    // modifiable avant confirmation.
-    const [userId, setUserId] = useState<number | null>(bien.userRestitution?.id ?? null);
+    // Préremplissage — service de restitution par défaut du bien
+    // (bien.serviceRestitution), modifiable avant confirmation. Facultatif :
+    // si aucun service n'est choisi, le backend utilise celui déjà défini
+    // sur le bien.
+    const [serviceId, setServiceId] = useState<number | null>(bien.serviceRestitution?.id ?? null);
+    const [serviceNom, setServiceNom] = useState<string>(bien.serviceRestitution?.nom ?? "");
     const [dateDebut, setDateDebut] = useState("");
     const [dateFin, setDateFin] = useState("");
     const [commentaire, setCommentaire] = useState("");
 
     const submit = () => {
-      if (userId == null) {
-        toast.error(t("biens.restitution.error.user"));
-        return;
-      }
       onSave({
-        user_id: userId,
+        service_id: serviceId ?? undefined,
         dateDebut: dateDebut.trim() || undefined,
         dateFin: dateFin.trim() || undefined,
         commentaire: commentaire.trim() || undefined,
@@ -3012,14 +3244,17 @@ function SortieDirectDialog({ bien, onClose, onSaved }: {
 
           <div className="space-y-4 p-5">
             <div className="space-y-1.5">
-              <ReqLabel required>{t("biens.restitution.field.user")}</ReqLabel>
-              <SearchableSelect
-                value={userId}
-                onChange={(v) => setUserId(v)}
-                options={users.map((u) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` }))}
-                placeholder={t("biens.restitution.selectUser")}
-                searchPlaceholder={t("biens.restitution.searchUser")}
+              <Label className="text-xs font-medium text-muted-foreground">{t("biens.restitution.field.service")}</Label>
+              <PosteOrgSelect
+                value={serviceId}
+                valueLabel={serviceNom}
+                onSelect={(node) => { setServiceId(node.id); setServiceNom(node.nom); }}
+                onClear={() => { setServiceId(null); setServiceNom(""); }}
+                selectAnyNode
+                placeholder={t("biens.restitution.selectService")}
+                searchPlaceholder={t("biens.restitution.searchService")}
               />
+              <p className="text-[10px] text-muted-foreground">{t("biens.restitution.serviceHint")}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -3204,18 +3439,6 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
         </div>
       </div>
     );
-  }
-
-  function pageList(current: number, total: number): (number | "...")[] {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const out: (number | "...")[] = [1];
-    const s = Math.max(2, current - 1);
-    const e = Math.min(total - 1, current + 1);
-    if (s > 2) out.push("...");
-    for (let i = s; i <= e; i++) out.push(i);
-    if (e < total - 1) out.push("...");
-    out.push(total);
-    return out;
   }
 
   // La section Localisation ne concerne que les biens des catégories "Terrains"
@@ -3506,12 +3729,6 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
           commentaire: payload.commentaire,
         };
 
-        if (payload.methodConso === "TRANSFER_DIRECT" && payload.transferPieces && payload.transferPieces.length > 0) {
-          affectationPayload.commentaire = `${payload.commentaire || ""} [Méthode: Transfer Direct, Pièces: ${payload.transferPieces.map((p) => p.nom).join(", ")}]`.trim();
-        } else if (payload.methodConso === "BSP" && payload.bspData) {
-          affectationPayload.commentaire = `${payload.commentaire || ""} [Méthode: BSP, Qté demandée: ${payload.bspData.quantiteDemandee}, Qté accordée: ${payload.bspData.quantiteAccordee}, Qté servie: ${payload.bspData.quantiteServie}]`.trim();
-        }
-
         return createAffectation(bien.id, affectationPayload);
       },
       onSuccess: (created) => {
@@ -3544,12 +3761,6 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
           dateFin: payload.dateFin,
           commentaire: payload.commentaire,
         };
-
-        if (payload.methodConso === "TRANSFER_DIRECT" && payload.transferPieces && payload.transferPieces.length > 0) {
-          affectationPayload.commentaire = `${payload.commentaire || ""} [Méthode: Transfer Direct, Pièces: ${payload.transferPieces.map((p) => p.nom).join(", ")}]`.trim();
-        } else if (payload.methodConso === "BSP" && payload.bspData) {
-          affectationPayload.commentaire = `${payload.commentaire || ""} [Méthode: BSP, Qté demandée: ${payload.bspData.quantiteDemandee}, Qté accordée: ${payload.bspData.quantiteAccordee}, Qté servie: ${payload.bspData.quantiteServie}]`.trim();
-        }
 
         return updateAffectation(id, affectationPayload);
       },
@@ -3868,54 +4079,66 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
           </Button>
           <div className="flex items-center gap-2">
             {isNotReceived && (
-              <Button
-                size="sm"
-                className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
-                disabled={acknowledgeDetailMutation.isPending}
-                onClick={() => acknowledgeDetailMutation.mutate()}
-              >
-                <CheckCircle2 className="h-4 w-4" /> {t("biens.detail.acknowledgeReception")}
-              </Button>
-            )}
-            <Button variant="outline" size="sm" className="gap-2"
-              onClick={onPrint}>
-              <Printer className="h-4 w-4" /> {t("biens.print.printFiche")}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2" disabled={isNotReceived}>
-                  <Download className="h-4 w-4" /> {t("action.export")}
-                  <ChevronDown className="h-3.5 w-3.5" />
+              <CanAccess permission="accuser_reception_bien">
+                <Button
+                  size="sm"
+                  className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                  disabled={acknowledgeDetailMutation.isPending}
+                  onClick={() => acknowledgeDetailMutation.mutate()}
+                >
+                  <CheckCircle2 className="h-4 w-4" /> {t("biens.detail.acknowledgeReception")}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{t("biens.detail.exportFormat")}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="gap-2" onSelect={() => exportBienPDF({
-                  bien: b,
-                  affectations: sortedAffectations,
-                  maintenances: allMaintenances,
-                  reevals: allReevals,
-                  deprecs: allDepreciations,
-                }, t)}>
-                  <FileText className="h-4 w-4" /> PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2" onSelect={() => exportBienExcel({
-                  bien: b,
-                  affectations: sortedAffectations,
-                  maintenances: allMaintenances,
-                  reevals: allReevals,
-                  deprecs: allDepreciations,
-                }, t)}>
-                  <FileSpreadsheet className="h-4 w-4" /> Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10"
-              disabled={isNotReceived}
-              onClick={() => setDeleteDialogOpen(true)}>
-              <Trash2 className="h-4 w-4" /> {t("action.delete")}
-            </Button>
+              </CanAccess>
+            )}
+            <CanAccess permission="imprimer_fiche_bien">
+              <Button variant="outline" size="sm" className="gap-2"
+                onClick={onPrint}>
+                <Printer className="h-4 w-4" /> {t("biens.print.printFiche")}
+              </Button>
+            </CanAccess>
+            <CanAccess anyOf={["export_bien", "exporter_excel", "exporter_pdf"]}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2" disabled={isNotReceived}>
+                    <Download className="h-4 w-4" /> {t("action.export")}
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>{t("biens.detail.exportFormat")}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <CanAccess permission="exporter_pdf">
+                    <DropdownMenuItem className="gap-2" onSelect={() => exportBienPDF({
+                      bien: b,
+                      affectations: sortedAffectations,
+                      maintenances: allMaintenances,
+                      reevals: allReevals,
+                      deprecs: allDepreciations,
+                    }, t)}>
+                      <FileText className="h-4 w-4" /> PDF
+                    </DropdownMenuItem>
+                  </CanAccess>
+                  <CanAccess permission="exporter_excel">
+                    <DropdownMenuItem className="gap-2" onSelect={() => exportBienExcel({
+                      bien: b,
+                      affectations: sortedAffectations,
+                      maintenances: allMaintenances,
+                      reevals: allReevals,
+                      deprecs: allDepreciations,
+                    }, t)}>
+                      <FileSpreadsheet className="h-4 w-4" /> Excel
+                    </DropdownMenuItem>
+                  </CanAccess>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CanAccess>
+            <CanAccess permission="supprimer_bien">
+              <Button variant="outline" size="sm" className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+                disabled={isNotReceived}
+                onClick={() => setDeleteDialogOpen(true)}>
+                <Trash2 className="h-4 w-4" /> {t("action.delete")}
+              </Button>
+            </CanAccess>
           </div>
         </div>
 
@@ -3958,17 +4181,27 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
           <div className="overflow-x-auto border-b border-border pb-2">
             <TabsList className="h-auto min-w-max justify-start bg-transparent p-0">
               <TabsTrigger value="general">{t("biens.detail.tab.general")}</TabsTrigger>
-              <TabsTrigger value="affectations">{t("biens.detail.tab.affectations")}</TabsTrigger>
+              <CanAccess permission="affectation_bien">
+                <TabsTrigger value="affectations">{t("biens.detail.tab.affectations")}</TabsTrigger>
+              </CanAccess>
               <TabsTrigger value="fournisseur">{t("biens.detail.tab.financial")}</TabsTrigger>
-              <TabsTrigger value="maintenance">{t("biens.block.maintenance")}</TabsTrigger>
+              <CanAccess permission="consultation_maintenance">
+                <TabsTrigger value="maintenance">{t("biens.block.maintenance")}</TabsTrigger>
+              </CanAccess>
               {fullBien?.activeReevaluation && (
-                <TabsTrigger value="reevaluations">{t("biens.detail.tab.reevaluations")}</TabsTrigger>
+                <CanAccess permission="consultation_valorisation">
+                  <TabsTrigger value="reevaluations">{t("biens.detail.tab.reevaluations")}</TabsTrigger>
+                </CanAccess>
               )}
               {fullBien?.activeDepreciation && (
-                <TabsTrigger value="depreciations">{t("biens.detail.tab.depreciations")}</TabsTrigger>
+                <CanAccess permission="consultation_amortissement">
+                  <TabsTrigger value="depreciations">{t("biens.detail.tab.depreciations")}</TabsTrigger>
+                </CanAccess>
               )}
               {fullBien?.activeAmortissement && (
-                <TabsTrigger value="amortissements">{t("biens.amortissement")}</TabsTrigger>
+                <CanAccess permission="consultation_amortissement">
+                  <TabsTrigger value="amortissements">{t("biens.amortissement")}</TabsTrigger>
+                </CanAccess>
               )}
             </TabsList>
           </div>
@@ -3979,7 +4212,9 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
           action={
             <div className="flex flex-wrap items-center gap-2">
               <MercurialeButton bien={b} />
-              <Button variant="outline" size="sm" className="gap-2" onClick={onEdit}><Pencil className="h-4 w-4" /> {t("action.edit")}</Button>
+              <CanAccess permission="modifier_bien">
+                <Button variant="outline" size="sm" className="gap-2" onClick={onEdit}><Pencil className="h-4 w-4" /> {t("action.edit")}</Button>
+              </CanAccess>
             </div>
           }
         >
@@ -3995,6 +4230,11 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
               <KV k={t("users.service")} v={b.service?.nom} />
               <KV k={t("biens.field.acquisition")} v={b.dateAcquisition} />
               <KV k={t("biens.field.valeur")} v={formatFCFA(b.valeur)} />
+              <KV k={t("biens.detail.valeurActuelle")} v={
+                fullBien?.amortissement?.valeurActuelle != null
+                  ? formatFCFA(fullBien.amortissement.valeurActuelle)
+                  : "—"
+              } />
               <KV k={t("biens.detail.field.coutMaintenance")} v={b.coutTotalMaintenance != null ? formatFCFA(b.coutTotalMaintenance) : "—"} />
               <KV k={t("biens.detail.field.sourceFinancementProjet")} v={
                 (b.sourceFinancement ?? b.projects?.[0]?.nom)
@@ -4162,12 +4402,16 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
           action={
             inline === "sortie" || inline === "affectation" ? null : (
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10" onClick={() => setInline("sortie")}>
-                  <DoorOpen className="h-4 w-4" /> {assetExit ? t("biens.sortie") : t("biens.detail.sortir")}
-                </Button>
-                <Button size="sm" className="gap-2" onClick={() => { setEditingAffectation(null); setInline("affectation"); }}>
-                  <Plus className="h-4 w-4" /> {t("biens.newAffectation")}
-                </Button>
+                <CanAccess permission="sortir_bien">
+                  <Button variant="outline" size="sm" className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10" onClick={() => setInline("sortie")}>
+                    <DoorOpen className="h-4 w-4" /> {assetExit ? t("biens.sortie") : t("biens.detail.sortir")}
+                  </Button>
+                </CanAccess>
+                <CanAccess permission="creer_affectation_bien">
+                  <Button size="sm" className="gap-2" onClick={() => { setEditingAffectation(null); setInline("affectation"); }}>
+                    <Plus className="h-4 w-4" /> {t("biens.newAffectation")}
+                  </Button>
+                </CanAccess>
               </div>
             )
           }
@@ -4230,18 +4474,26 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
               <EventTable
                 columns={[t("biens.detail.col.dateAffectation"), t("biens.detail.col.origine"), t("biens.detail.col.destination"), t("biens.detail.col.type"), t("biens.detail.col.responsable"), t("biens.detail.motif"), t("biens.detail.col.auteur")]}
                 rows={sortedAffectations.map((a, idx) => {
-                  // Origine = structure de l'affectation chronologiquement
-                  // précédente (sortedAffectations est trié du plus récent au
-                  // plus ancien, donc l'élément suivant dans le tableau est
-                  // l'affectation antérieure) — aucun champ "origine" n'existe
-                  // côté backend, dérivé ici. Rien pour la toute première
-                  // affectation d'un bien (pas d'origine antérieure).
+                  // sortedAffectations est trié du plus récent au plus ancien
+                  // (voir sa définition). Le service/poste "d'origine" d'une
+                  // affectation est donc celui de l'affectation PRÉCÉDENTE
+                  // (l'entrée suivante dans ce tableau trié) : là où se
+                  // trouvait le bien avant cette affectation. La toute
+                  // première affectation (la plus ancienne) n'a pas d'origine
+                  // (création du bien).
+                  const affectationService = (aff: ApiAffectation) => aff.service?.nom || aff.utilisateur?.service?.nom || null;
                   const previous = sortedAffectations[idx + 1];
-                  const origine = previous ? (previous.service?.nom || "—") : "—";
+                  const origine = (previous ? affectationService(previous) : null) || "—";
+                  // Destination = service/poste affecté (a.service), ou à
+                  // défaut le service/poste de rattachement de l'individu
+                  // affecté (a.utilisateur.service) — affiché même si le
+                  // destinataire n'a pas encore accusé réception (demande
+                  // explicite, 2026-09-01).
+                  const destination = affectationService(a) || "—";
                   return [
                     a.dateDebut,
                     origine,
-                    a.service?.nom || "—",
+                    destination,
                     a.typeAffectation ?? "—",
                     a.utilisateur ? `${a.utilisateur.firstName} ${a.utilisateur.lastName}` : "—",
                     a.commentaire ?? "—",
@@ -4283,6 +4535,11 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
               <SubSection title={t("biens.detail.tab.financial")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
                   <KV k={t("biens.field.valeur")} v={formatFCFA(b.valeur)} />
+                  <KV k={t("biens.detail.valeurActuelle")} v={
+                    fullBien?.amortissement?.valeurActuelle != null
+                      ? formatFCFA(fullBien.amortissement.valeurActuelle)
+                      : "—"
+                  } />
                   <KV k={t("biens.detail.field.coutMaintenance")} v={b.coutTotalMaintenance != null ? formatFCFA(b.coutTotalMaintenance) : "—"} />
                   <KV k={t("biens.detail.field.sourceFinancementProjet")} v={
                     (b.sourceFinancement ?? b.projects?.[0]?.nom)
@@ -4321,9 +4578,11 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
         <Section num={5} title={t("biens.block.maintenance")}
           action={
             inline !== "maintenance" ? (
-              <Button size="sm" variant="outline" className="gap-2" onClick={() => { setEditingMaintenance(null); setInline("maintenance"); }}>
-                <Plus className="h-4 w-4" /> {t("action.add")}
-              </Button>
+              <CanAccess permission="creation_besoin_maintenance">
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => { setEditingMaintenance(null); setInline("maintenance"); }}>
+                  <Plus className="h-4 w-4" /> {t("action.add")}
+                </Button>
+              </CanAccess>
             ) : null
           }
         >
@@ -4368,9 +4627,11 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
         <Section num={7} title={t("biens.detail.tab.reevaluations")}
           action={
             inline !== "reevaluation" ? (
-              <Button size="sm" variant="outline" className="gap-2" onClick={() => { setEditingReeval(null); setInline("reevaluation"); }}>
-                <Plus className="h-4 w-4" /> {t("biens.detail.newReeval")}
-              </Button>
+              <CanAccess permission="creation_reevaluation">
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => { setEditingReeval(null); setInline("reevaluation"); }}>
+                  <Plus className="h-4 w-4" /> {t("biens.detail.newReeval")}
+                </Button>
+              </CanAccess>
             ) : null
           }
         >
@@ -4413,9 +4674,11 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
         <Section num={8} title={t("biens.detail.tab.depreciations")}
           action={
             inline !== "depreciation" ? (
-              <Button size="sm" variant="outline" className="gap-2" onClick={() => { setEditingDepreciation(null); setInline("depreciation"); }}>
-                <Plus className="h-4 w-4" /> {t("biens.detail.newDeprec")}
-              </Button>
+              <CanAccess permission="consultation_amortissement">
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => { setEditingDepreciation(null); setInline("depreciation"); }}>
+                  <Plus className="h-4 w-4" /> {t("biens.detail.newDeprec")}
+                </Button>
+              </CanAccess>
             ) : null
           }
         >
@@ -4603,15 +4866,6 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
     });
     const projects = projectsData?.data ?? [];
 
-    // Utilisateur de restitution par défaut — même cache que BiensList
-    // (queryKey partagée : pas de requête supplémentaire si déjà chargée).
-    const { data: usersCacheForEnrich = [] } = useQuery({
-      queryKey: ["users-all"],
-      queryFn: listAllUsers,
-      staleTime: 300_000,
-      refetchOnWindowFocus: false,
-    });
-
     // ── État du formulaire ────────────────────────────────────────────────────
     const buildFormFromBien = (b: ApiBien): BienFormState => ({
       nom: b.nom ?? "",
@@ -4638,7 +4892,8 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
       etat_bien_id: b.etatBien?.id ?? null,
       service_id: b.service?.id ?? null,
       user_id: b.utilisateur?.id ?? null,
-      user_restitution_id: b.userRestitution?.id ?? null,
+      service_restitution_id: b.serviceRestitution?.id ?? null,
+      service_restitution_nom: b.serviceRestitution?.nom ?? "",
       service_nom: b.service?.nom ?? "",
       matricule_nom: b.utilisateur
         ? `${b.utilisateur.matricule ?? ""} — ${b.utilisateur.firstName} ${b.utilisateur.lastName}`
@@ -4660,6 +4915,7 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
       activeDepreciation: b.activeDepreciation ?? true,
       activeAmortissement: b.activeAmortissement ?? true,
       securityModes: new Set<SecurityMode>(),
+      securityPieces: [],
     });
 
     const [form, setForm] = useState<BienFormState>(() =>
@@ -4996,7 +5252,6 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
     // ── Validation et soumission ──────────────────────────────────────────────
     const submit = () => {
       const required: [keyof BienFormState, string, number][] = [
-        ["nom", t("biens.detail.field.nomBien"), 1],
         ["dateAcquisition", t("biens.field.acquisition"), 1],
         ["category_id", t("biens.field.categorie"), 1],
         ["asset_type_id", t("biens.list.col.assetType"), 1],
@@ -5010,6 +5265,10 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
       if (!form.service_id) {
         toast.error(t("biens.form.error.serviceRequired"));
         setOpenSection(1);
+        return;
+      }
+      if (mode === "create" && form.securityModes.has("Juridique") && form.securityPieces.length === 0) {
+        toast.error(t("biens.form.error.securityPiecesRequired"));
         return;
       }
       for (const [k, label, section] of required) {
@@ -5155,6 +5414,55 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
             </div>
           )}
 
+          {/* Pièces justificatives de sécurisation — visibles dès qu'au moins
+              un mode est coché, mais obligatoires uniquement si le mode
+              "Juridique" est sélectionné (la sécurisation "Physique" seule
+              n'exige pas de justificatif). */}
+          {mode === "create" && form.securityModes.size > 0 && (
+            <div className="border-b border-border px-5 py-3">
+              <ReqLabel required={form.securityModes.has("Juridique")}>{t("biens.securisation.field.pieces")}</ReqLabel>
+              <label className="mt-1.5 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-xs text-muted-foreground hover:bg-primary/10">
+                <Upload className="h-4 w-4 shrink-0 text-primary" />
+                <span>{t("biens.securisation.attachForAsset")}</span>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    set("securityPieces", [...form.securityPieces, ...files.map((file) => ({ file, nom: file.name }))]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {form.securityPieces.length > 0 && (
+                <ul className="mt-2 space-y-1.5">
+                  {form.securityPieces.map((p, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <Input
+                        className="h-7 flex-1 text-xs"
+                        value={p.nom}
+                        onChange={(e) => {
+                          const updated = [...form.securityPieces];
+                          updated[i] = { ...updated[i], nom: e.target.value };
+                          set("securityPieces", updated);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => set("securityPieces", form.securityPieces.filter((_, j) => j !== i))}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-1 text-[10px] text-muted-foreground">{t("biens.form.securityPiecesHint")}</p>
+            </div>
+          )}
+
           <div className="px-5">
 
             {/* ─── Section 1 : Informations générales ─── */}
@@ -5163,7 +5471,7 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
                 <div className="grid flex-1 gap-4 sm:grid-cols-2">
 
                   <div className="space-y-1.5">
-                    <ReqLabel required>{t("biens.detail.field.nomBien")}</ReqLabel>
+                    <ReqLabel>{t("biens.detail.field.nomBien")}</ReqLabel>
                     <Input value={form.nom} onChange={(e) => set("nom", e.target.value)} placeholder={t("biens.form.nomBienPlaceholder")} />
                   </div>
 
@@ -5310,18 +5618,6 @@ function ReformeRequestDialog({ bien, onClose, onSent }: {
                       placeholder={t("biens.form.selectPoste")}
                       searchPlaceholder={t("biens.form.searchPoste")}
                     />
-                  </div>
-
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <ReqLabel>{t("biens.form.userRestitution")}</ReqLabel>
-                    <SearchableSelect
-                      value={form.user_restitution_id}
-                      onChange={(v) => set("user_restitution_id", v)}
-                      options={usersCacheForEnrich.map((u) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` }))}
-                      placeholder={t("biens.restitution.selectUser")}
-                      searchPlaceholder={t("biens.restitution.searchUser")}
-                    />
-                    <p className="text-[10px] text-muted-foreground">{t("biens.form.userRestitutionHint")}</p>
                   </div>
 
                   <div className="space-y-1.5">
@@ -7008,9 +7304,6 @@ function SortieFormInline({ isSaving, onCancel, onSave, bienNom, bienReference }
     const [typeAffectation, setTypeAffectation] = useState(initial?.typeAffectation ?? "AFFECTATION");
     const [dateDebut, setDateDebut]         = useState(initial?.dateDebut ?? today);
     const [commentaire, setCommentaire]     = useState(initial?.commentaire ?? "");
-    const [methodConso, setMethodConso]     = useState<string>("");
-    const [transferPieces, setTransferPieces] = useState<Array<{ file: File; nom: string }>>([]);
-    const [bspData, setBspData]             = useState<AffectationBspData>({});
     const isEdit = !!initial;
 
     const selectPoste = (node: ApiOrgNode) => {
@@ -7034,124 +7327,12 @@ function SortieFormInline({ isSaving, onCancel, onSave, bienNom, bienReference }
         typeAffectation,
         dateDebut,
         commentaire: commentaire || undefined,
-        methodConso: methodConso || undefined,
-        transferPieces: transferPieces.length > 0 ? transferPieces : undefined,
-        bspData: methodConso === "BSP" ? bspData : undefined,
       });
-    };
-
-    const handleTransferFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
-      if (files.length === 0) return;
-      setTransferPieces((prev) => [...prev, ...files.map((f) => ({ file: f, nom: f.name }))]);
-      e.target.value = "";
     };
 
     return (
       <div className="animate-in fade-in-50 space-y-4 duration-150">
         <p className="text-sm font-semibold text-primary">{isEdit ? t("biens.affectationForm.editTitle") : t("biens.newAffectation")}</p>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label={t("biens.affectationForm.typeAffectation")}>
-            <Select value={typeAffectation} onValueChange={setTypeAffectation}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["AFFECTATION", "TRANSFERT"].map((tv) => <SelectItem key={tv} value={tv}>{tv}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-
-          <Field label={t("biens.affectationForm.methodeConsomptible")}>
-            <Select value={methodConso} onValueChange={setMethodConso}>
-              <SelectTrigger><SelectValue placeholder={t("biens.affectationForm.selectMethode")} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="TRANSFER_DIRECT">Transfer Direct</SelectItem>
-                <SelectItem value="BSP">BSP</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-
-        {methodConso === "TRANSFER_DIRECT" && (
-          <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
-            <p className="text-sm font-medium text-foreground">Transfer Direct</p>
-            <Field label={t("biens.affectationForm.piecesTransfer")}>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="file"
-                  multiple
-                  onChange={handleTransferFileChange}
-                  className="flex-1"
-                />
-                <Button type="button" variant="outline" size="sm">
-                  <Upload className="h-4 w-4 mr-2" />
-                  {t("action.add")}
-                </Button>
-              </div>
-              {transferPieces.length > 0 && (
-                <ul className="space-y-2 mt-2">
-                  {transferPieces.map((p, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm">
-                      <span className="flex-1 truncate">📎 {p.nom}</span>
-                      <button
-                        type="button"
-                        onClick={() => setTransferPieces((prev) => prev.filter((_, j) => j !== i))}
-                        className="text-destructive"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Field>
-          </div>
-        )}
-
-        {methodConso === "BSP" && (
-          <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
-            <p className="text-sm font-medium text-foreground">BSP ({t("biens.affectationForm.bonSortieProvisionnel")})</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={t("biens.affectationForm.quantiteDemandee")}>
-                <Input
-                  type="number"
-                  value={bspData.quantiteDemandee ?? ""}
-                  onChange={(e) => setBspData({ ...bspData, quantiteDemandee: e.target.value })}
-                  placeholder="0"
-                />
-              </Field>
-              <Field label={t("biens.affectationForm.quantiteAccordee")}>
-                <Input
-                  type="number"
-                  value={bspData.quantiteAccordee ?? ""}
-                  onChange={(e) => setBspData({ ...bspData, quantiteAccordee: e.target.value })}
-                  placeholder="0"
-                />
-              </Field>
-              <Field label={t("biens.affectationForm.quantiteServie")}>
-                <Input
-                  type="number"
-                  value={bspData.quantiteServie ?? ""}
-                  onChange={(e) => setBspData({ ...bspData, quantiteServie: e.target.value })}
-                  placeholder="0"
-                />
-              </Field>
-              <Field label={t("biens.affectationForm.dateBsp")}>
-                <Input
-                  type="date"
-                  value={bspData.dateBsp || ""}
-                  onChange={(e) => setBspData({ ...bspData, dateBsp: e.target.value })}
-                />
-              </Field>
-            </div>
-            <Field label={t("biens.affectationForm.observationsBsp")}>
-              <Textarea
-                rows={2}
-                value={bspData.observations || ""}
-                onChange={(e) => setBspData({ ...bspData, observations: e.target.value })}
-                placeholder={t("biens.affectationForm.observationsBspPlaceholder")}
-              />
-            </Field>
-          </div>
-        )}
 
         {/* L'affectation cible le poste sélectionné dans l'organigramme —
             l'utilisateur rattaché à ce poste est le destinataire de
@@ -7397,9 +7578,6 @@ function SortieFormInline({ isSaving, onCancel, onSave, bienNom, bienReference }
     const [dateDebut, setDateDebut] = useState(today);
     const [dateFin, setDateFin] = useState("");
     const [commentaire, setCommentaire] = useState("");
-    const [methodConso, setMethodConso] = useState<string>("");
-    const [transferPieces, setTransferPieces] = useState<Array<{ file: File; nom: string }>>([]);
-    const [bspData, setBspData] = useState<AffectationBspData>({});
 
     const selectPoste = (node: ApiOrgNode) => {
       setServiceId(node.id);
@@ -7412,25 +7590,9 @@ function SortieFormInline({ isSaving, onCancel, onSave, bienNom, bienReference }
       setUserId(null);
     };
 
-    const handleTransferFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
-      if (files.length === 0) return;
-      setTransferPieces((prev) => [...prev, ...files.map((f) => ({ file: f, nom: f.name }))]);
-      e.target.value = "";
-    };
-
     const mutation = useMutation({
       mutationFn: () => {
         if (!bienId || !serviceId) throw new Error(t("biens.drawer.missingData"));
-
-        let finalCommentaire = commentaire || "";
-        
-        // Handle consumable method logic
-        if (methodConso === "TRANSFER_DIRECT" && transferPieces.length > 0) {
-          finalCommentaire = `${finalCommentaire} [Méthode: Transfer Direct, Pièces: ${transferPieces.map(p => p.nom).join(", ")}]`.trim();
-        } else if (methodConso === "BSP" && bspData) {
-          finalCommentaire = `${finalCommentaire} [Méthode: BSP, Qté demandée: ${bspData.quantiteDemandee}, Qté accordée: ${bspData.quantiteAccordee}, Qté servie: ${bspData.quantiteServie}]`.trim();
-        }
 
         return createAffectation(bienId, {
           service_id: serviceId,
@@ -7438,15 +7600,11 @@ function SortieFormInline({ isSaving, onCancel, onSave, bienNom, bienReference }
           typeAffectation,
           dateDebut,
           dateFin: dateFin || undefined,
-          commentaire: finalCommentaire || undefined,
+          commentaire: commentaire || undefined,
         });
       },
       onSuccess: () => {
         toast.success(t("biens.detail.toast.affectationSaved2"));
-        // Reset consumable-specific states
-        setMethodConso("");
-        setTransferPieces([]);
-        setBspData({});
         onSave();
       },
       onError: (err: unknown) => {
@@ -7458,121 +7616,13 @@ function SortieFormInline({ isSaving, onCancel, onSave, bienNom, bienReference }
     return (
       <DrawerShell open={open} onOpenChange={onOpenChange} title={t("biens.newAffectation")}
         subtitle={t("biens.drawer.affectationSubtitle")} icon={UserIcon}
-        onCancel={() => {
-          setMethodConso("");
-          setTransferPieces([]);
-          setBspData({});
-          onOpenChange(false);
-        }}
+        onCancel={() => onOpenChange(false)}
         onSave={() => {
           if (!serviceId) { toast.error(t("biens.affectationForm.error.posteRequired")); return; }
           if (!userId) { toast.error(t("biens.affectationForm.error.posteNoUser")); return; }
           mutation.mutate();
         }}>
         <div className="space-y-4">
-          <Field label={t("biens.affectationForm.typeAffectation")}>
-            <Select value={typeAffectation} onValueChange={setTypeAffectation}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {["AFFECTATION", "TRANSFERT", "MISE_EN_GARDE"].map((tv) => (
-                  <SelectItem key={tv} value={tv}>{tv}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label={t("biens.affectationForm.methodeConsomptible")}>
-            <Select value={methodConso} onValueChange={setMethodConso}>
-              <SelectTrigger><SelectValue placeholder={t("biens.affectationForm.selectMethode")} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="TRANSFER_DIRECT">Transfer Direct</SelectItem>
-                <SelectItem value="BSP">BSP</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {methodConso === "TRANSFER_DIRECT" && (
-            <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
-              <p className="text-sm font-medium text-foreground">Transfer Direct</p>
-              <Field label={t("biens.affectationForm.piecesTransfer")}>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="file"
-                    multiple
-                    onChange={handleTransferFileChange}
-                    className="flex-1"
-                  />
-                  <Button type="button" variant="outline" size="sm">
-                    <Upload className="h-4 w-4 mr-2" />
-                    {t("action.add")}
-                  </Button>
-                </div>
-                {transferPieces.length > 0 && (
-                  <ul className="space-y-2 mt-2">
-                    {transferPieces.map((p, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <span className="flex-1 truncate">📎 {p.nom}</span>
-                        <button
-                          type="button"
-                          onClick={() => setTransferPieces((prev) => prev.filter((_, j) => j !== i))}
-                          className="text-destructive"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Field>
-            </div>
-          )}
-
-          {methodConso === "BSP" && (
-            <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
-              <p className="text-sm font-medium text-foreground">BSP ({t("biens.affectationForm.bonSortieProvisionnel")})</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={t("biens.affectationForm.quantiteDemandee")}>
-                  <Input
-                    type="number"
-                    value={bspData.quantiteDemandee ?? ""}
-                    onChange={(e) => setBspData({ ...bspData, quantiteDemandee: e.target.value })}
-                    placeholder="0"
-                  />
-                </Field>
-                <Field label={t("biens.affectationForm.quantiteAccordee")}>
-                  <Input
-                    type="number"
-                    value={bspData.quantiteAccordee ?? ""}
-                    onChange={(e) => setBspData({ ...bspData, quantiteAccordee: e.target.value })}
-                    placeholder="0"
-                  />
-                </Field>
-                <Field label={t("biens.affectationForm.quantiteServie")}>
-                  <Input
-                    type="number"
-                    value={bspData.quantiteServie ?? ""}
-                    onChange={(e) => setBspData({ ...bspData, quantiteServie: e.target.value })}
-                    placeholder="0"
-                  />
-                </Field>
-                <Field label={t("biens.affectationForm.dateBsp")}>
-                  <Input
-                    type="date"
-                    value={bspData.dateBsp || ""}
-                    onChange={(e) => setBspData({ ...bspData, dateBsp: e.target.value })}
-                  />
-                </Field>
-              </div>
-              <Field label={t("biens.affectationForm.observationsBsp")}>
-                <Textarea
-                  rows={2}
-                  value={bspData.observations || ""}
-                  onChange={(e) => setBspData({ ...bspData, observations: e.target.value })}
-                  placeholder={t("biens.affectationForm.observationsBspPlaceholder")}
-                />
-              </Field>
-            </div>
-          )}
-
           <Field label={t("biens.form.structureServicePosteRequired")}>
             <PosteOrgSelect
               value={serviceId}

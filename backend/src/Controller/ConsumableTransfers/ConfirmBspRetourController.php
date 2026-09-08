@@ -5,8 +5,10 @@ namespace App\Controller\ConsumableTransfers;
 use App\Entity\Bsp;
 use App\Entity\ConsumableBsp;
 use App\Entity\ConsumableTransfer;
+use App\Entity\User;
 use App\Repository\ConsumableBspRepository;
 use App\Repository\ConsumableTransferRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableStockManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,6 +17,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -59,8 +62,10 @@ final class ConfirmBspRetourController extends AbstractController
     #[OA\Response(response: 404, description: 'Not Found', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le transfert demandé est introuvable.', 'data' => null]))]
     public function __invoke(
         int $id,
+        #[CurrentUser] User $user,
         ConsumableTransferRepository $consumableTransferRepository,
         ConsumableBspRepository $consumableBspRepository,
+        ConsumableAccessChecker $accessChecker,
         ConsumableStockManager $stockManager,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
@@ -68,6 +73,8 @@ final class ConfirmBspRetourController extends AbstractController
         if (!$transfer instanceof ConsumableTransfer) {
             return $apiResponse->error('Le transfert demandé est introuvable.', Response::HTTP_NOT_FOUND);
         }
+
+        $accessChecker->assertCanAccessTransfer($user, $transfer);
 
         if ($transfer->getType() !== 'BSP') {
             return $apiResponse->error('Ce transfert n\'est pas de type BSP.', Response::HTTP_BAD_REQUEST);
@@ -85,11 +92,6 @@ final class ConfirmBspRetourController extends AbstractController
 
         if ($bsp->isRetour()) {
             return $apiResponse->error('Ce BSP est déjà marqué comme retourné.', Response::HTTP_BAD_REQUEST);
-        }
-
-        $user = $this->getUser();
-        if (!$user) {
-            return $apiResponse->error('Utilisateur non authentifié.', Response::HTTP_UNAUTHORIZED);
         }
 
         $bsp->setRetour(true);

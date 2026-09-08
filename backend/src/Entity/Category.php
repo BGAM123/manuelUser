@@ -51,6 +51,10 @@ class Category
     #[Groups(['category:list', 'category:detail'])]
     private ?int $seuil = null;
 
+    #[ORM\Column(nullable: true)]
+    #[Groups(['category:list', 'category:detail'])]
+    private ?int $ordre = null;
+
      #[ORM\Column(nullable: true)]
     #[Assert\NotNull(message: "consomtible es true ou false.")]
     #[Groups(['category:list', 'category:detail'])]
@@ -150,6 +154,17 @@ class Category
     {
         $this->description = $description;
 
+        return $this;
+    }
+
+    public function getOrdre(): ?int
+    {
+        return $this->ordre;
+    }
+
+    public function setOrdre(?int $ordre): static
+    {
+        $this->ordre = $ordre;
         return $this;
     }
 

@@ -184,6 +184,7 @@ final class AssetDetailController extends AbstractController
                     ],
                     'createdAt' => '2026-07-30 15:45:10',
                     'updatedAt' => '2026-07-31 09:10:42',
+                    'doitEtreRestitue' => false,
                 ],
             ]
         )

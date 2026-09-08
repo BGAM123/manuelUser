@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listPermissions,
   createPermissions,
@@ -181,15 +182,17 @@ export function PermissionsSection() {
               <Switch checked={showDeleted} onCheckedChange={setShowDeleted} />
               {t("common.showDeleted")}
             </label>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setSelected(null);
-                setView("form");
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("permissions.create")}
-            </Button>
+            <CanAccess permission="creation_permission">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setSelected(null);
+                  setView("form");
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("permissions.create")}
+              </Button>
+            </CanAccess>
           </div>
         </div>
         <DataTable
@@ -202,27 +205,33 @@ export function PermissionsSection() {
           rowActions={(p) => (
             <>
               {!showDeleted && (
-                <RowIconButton
-                  icon={Pencil}
-                  label={t("action.edit")}
-                  onClick={() => {
-                    setSelected(p);
-                    setView("form");
-                  }}
-                />
+                <CanAccess permission="creation_permission">
+                  <RowIconButton
+                    icon={Pencil}
+                    label={t("action.edit")}
+                    onClick={() => {
+                      setSelected(p);
+                      setView("form");
+                    }}
+                  />
+                </CanAccess>
               )}
-              {showDeleted ? (
-                <RowIconButton icon={RotateCcw} label={t("action.restore")} onClick={() => setRestoreTarget(p)} />
-              ) : (
-                <RowIconButton icon={Archive} label={t("action.delete")} onClick={() => setArchiveTarget(p)} />
-              )}
+              <CanAccess permission="creation_permission">
+                {showDeleted ? (
+                  <RowIconButton icon={RotateCcw} label={t("action.restore")} onClick={() => setRestoreTarget(p)} />
+                ) : (
+                  <RowIconButton icon={Archive} label={t("action.delete")} onClick={() => setArchiveTarget(p)} />
+                )}
+              </CanAccess>
               {showDeleted && (
-                <RowIconButton
-                  icon={Trash2}
-                  label={t("common.permanentDelete")}
-                  tone="danger"
-                  onClick={() => setDeleteTarget(p)}
-                />
+                <CanAccess permission="creation_permission">
+                  <RowIconButton
+                    icon={Trash2}
+                    label={t("common.permanentDelete")}
+                    tone="danger"
+                    onClick={() => setDeleteTarget(p)}
+                  />
+                </CanAccess>
               )}
             </>
           )}

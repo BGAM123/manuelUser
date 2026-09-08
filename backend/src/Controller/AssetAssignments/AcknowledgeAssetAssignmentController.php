@@ -130,8 +130,23 @@ final class AcknowledgeAssetAssignmentController extends AbstractController
                     }
                 }
 
-                // Vérification 2: L'utilisateur est autorisé (ou administrateur)
-                if (!$isAdmin) {
+                // Vérification 2: L'utilisateur est autorisé (destinataire direct),
+                // OU administrateur — mais un admin ne peut accuser réception que
+                // des affectations de son PROPRE poste (service), pas de n'importe
+                // quel bien du patrimoine (demande explicite 2026-08-31 : "il ne
+                // peut qu'accuser réception des biens qui sont directement
+                // affectés à son poste").
+                if ($isAdmin) {
+                    $adminService = $user->getService();
+                    $assignmentService_ = $assignment->getService();
+                    if (!$adminService || !$assignmentService_ || $assignmentService_->getId() !== $adminService->getId()) {
+                        $errors[] = [
+                            'id' => $assignmentId,
+                            'reason' => "Ce bien n'est pas affecté à votre poste"
+                        ];
+                        continue;
+                    }
+                } else {
                     $recipient = $assignmentService->resolveRecipient($assignment);
                     if (!$recipient || $recipient->getId() !== $user->getId()) {
                         $errors[] = [

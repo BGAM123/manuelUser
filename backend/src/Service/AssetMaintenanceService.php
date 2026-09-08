@@ -127,21 +127,21 @@ final class AssetMaintenanceService
     {
         $seuil = $this->getMaintenanceThresholdForAsset($asset);
         $nombreMaintenances = $this->countMaintenancesForAsset($asset);
-        
+
         // Si pas de seuil défini
         if ($seuil === null) {
             return [
                 'seuil_defini' => false,
                 'seuil' => null,
-                'atteint' => false, 
+                'atteint' => false,
                 'nombre_maintenances' => $nombreMaintenances,
                 'message' => 'Aucun seuil défini pour cette catégorie.'
             ];
         }
-        
+
         $depasse = $nombreMaintenances > $seuil;
         $restant = max(0, $seuil - $nombreMaintenances);
-        
+
         return [
             'seuil_defini' => true,
             'seuil' => $seuil,
@@ -230,10 +230,10 @@ final class AssetMaintenanceService
                 if (null === $asset) {
                     throw new ResourceNotFoundException(sprintf('Bien introuvable : %s.', $assetId));
                 }
-                // Vérifier que le bien n'a pas le statut SORTI
-                if ($asset->getStatut() === 'SORTIE') {
+                // Vérifier que le bien n'a pas le statut SORTIS
+                if (in_array($asset->getStatut(), ['SORTIS', 'SORTIE'], true)) {
                     throw new ValidationFailedException([
-                        'asset_ids' => 'Le bien a le statut SORTIE et ne peut pas être inclus dans une maintenance.'
+                        'asset_ids' => 'Le bien a le statut SORTIS et ne peut pas être inclus dans une maintenance.'
                     ]);
                 }
                 $assets[] = $asset;

@@ -34,6 +34,10 @@ class Consumable implements BlameableInterface
     #[Groups(['consumable:detail'])]
     private ?string $description = null;
 
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['consumable:list', 'consumable:detail'])]
+    private ?string $unite_mesure = null;
+
     #[ORM\ManyToOne(targetEntity: Category::class)]
     #[ORM\JoinColumn(nullable: true)]
     #[Groups(['consumable:list', 'consumable:detail'])]
@@ -135,6 +139,18 @@ class Consumable implements BlameableInterface
     public function setNom(string $nom): static
     {
         $this->nom = $nom;
+        return $this;
+    }
+
+    public function getUnite_mesure(): ?string
+    {
+        return $this->unite_mesure;
+    }
+
+    public function setUnite_mesure(?string $unite_mesure): static
+    {
+        $this->unite_mesure = $unite_mesure;
+
         return $this;
     }
 

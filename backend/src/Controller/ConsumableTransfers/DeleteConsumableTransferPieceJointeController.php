@@ -3,7 +3,9 @@
 namespace App\Controller\ConsumableTransfers;
 
 use App\Entity\ConsumableTransfer;
+use App\Entity\User;
 use App\Exception\ResourceNotFoundException;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableTransferService;
 use OpenApi\Attributes as OA;
@@ -11,6 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -29,9 +32,13 @@ final class DeleteConsumableTransferPieceJointeController extends AbstractContro
     public function __invoke(
         ConsumableTransfer $transfer,
         int $pjId,
+        #[CurrentUser] User $user,
+        ConsumableAccessChecker $accessChecker,
         ConsumableTransferService $consumableTransferService,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
+        $accessChecker->assertCanAccessTransfer($user, $transfer);
+
         if ($transfer->isDelete()) {
             return $apiResponse->error('Ce transfert est supprimé.', Response::HTTP_CONFLICT);
         }

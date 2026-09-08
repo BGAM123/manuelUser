@@ -6,6 +6,7 @@ use App\Entity\Notification;
 use App\Entity\User;
 use App\Exception\ResourceNotFoundException;
 use App\Repository\UserRepository;
+use App\Service\AcknowledgementService;
 use App\Service\ApiResponseFactory;
 use App\Service\NotificationService;
 use OpenApi\Attributes as OA;
@@ -42,6 +43,7 @@ final class AdminListNotificationsController extends AbstractController
     public function __invoke(
         Request $request,
         NotificationService $notificationService,
+        AcknowledgementService $acknowledgementService,
         UserRepository $userRepository,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
@@ -69,7 +71,9 @@ final class AdminListNotificationsController extends AbstractController
         $notifications = $notificationService->findAllForAdmin($page, $limit, $isRead, $subjectType, $recipient);
         $total = $notificationService->countAllForAdmin($isRead, $subjectType, $recipient);
 
-        $data = array_map(fn (Notification $n) => $this->normalize($n), $notifications);
+        $acknowledgedMap = $this->buildAcknowledgedMap($notifications, $acknowledgementService);
+
+        $data = array_map(fn (Notification $n) => $this->normalize($n, $acknowledgedMap), $notifications);
 
         return $apiResponse->success([
             'meta' => [
@@ -82,7 +86,32 @@ final class AdminListNotificationsController extends AbstractController
         ], Response::HTTP_OK, 'Notifications retournées avec succès.');
     }
 
-    private function normalize(Notification $notification): array
+    /**
+     * @param Notification[] $notifications
+     * @return array<string, bool> clé "subjectType:subjectId" => accusé de réception effectué
+     */
+    private function buildAcknowledgedMap(array $notifications, AcknowledgementService $acknowledgementService): array
+    {
+        $idsBySubjectType = [];
+        foreach ($notifications as $notification) {
+            $idsBySubjectType[$notification->getSubjectType()][] = $notification->getSubjectId();
+        }
+
+        $map = [];
+        foreach ($idsBySubjectType as $subjectType => $subjectIds) {
+            $acks = $acknowledgementService->findForSubjects($subjectType, array_values(array_unique($subjectIds)));
+            foreach ($subjectIds as $subjectId) {
+                $map["{$subjectType}:{$subjectId}"] = isset($acks[$subjectId]);
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param array<string, bool> $acknowledgedMap
+     */
+    private function normalize(Notification $notification, array $acknowledgedMap): array
     {
         $recipient = $notification->getRecipient();
 
@@ -96,6 +125,7 @@ final class AdminListNotificationsController extends AbstractController
             'isRead' => $notification->isRead(),
             'readAt' => $notification->getReadAt()?->format('Y-m-d H:i:s'),
             'createdAt' => $notification->getCreatedAt()?->format('Y-m-d H:i:s'),
+            'isAcknowledged' => $acknowledgedMap["{$notification->getSubjectType()}:{$notification->getSubjectId()}"] ?? false,
             'destinataire' => $recipient ? [
                 'id' => $recipient->getId(),
                 'nom' => $recipient->getLastName(),

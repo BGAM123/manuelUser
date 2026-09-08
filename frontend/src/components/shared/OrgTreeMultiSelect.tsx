@@ -138,6 +138,22 @@ export function OrgTreeMultiSelect({
     if (deferApply) setStaged(next);
     else onChange(next);
   };
+  // Sélection en cascade : cliquer sur un nœud non cochable (Service/
+  // Direction, quand `selectableType` restreint à "Poste") sélectionne (ou
+  // désélectionne) d'un coup TOUS les postes descendants — y compris ceux
+  // situés sous des services enfants imbriqués (réaction en chaîne demandée
+  // explicitement, 2026-09-04). Ne s'applique que si `selectableType` est
+  // fourni : sans lui, chaque nœud reste cochable individuellement (ancien
+  // comportement, utilisé par ex. quand n'importe quel niveau est valide).
+  const toggleBulk = (ids: number[]) => {
+    if (ids.length === 0) return;
+    const allSelected = ids.every((id) => active.includes(id));
+    const next = allSelected
+      ? active.filter((id) => !ids.includes(id))
+      : Array.from(new Set([...active, ...ids]));
+    if (deferApply) setStaged(next);
+    else onChange(next);
+  };
   const apply = () => { onChange(staged); setOpen(false); };
   const clearApplied = () => onChange([]);
 
@@ -182,22 +198,33 @@ export function OrgTreeMultiSelect({
     });
 
   // Arbre complet — seuls les nœuds correspondant à selectableType (ou tous,
-  // si omis) sont cochables ; les autres ne servent qu'à déplier.
+  // si omis) sont cochables ; les autres ne servent qu'à déplier, SAUF si
+  // `selectableType` est fourni : dans ce cas ils deviennent eux aussi
+  // cliquables pour sélectionner/désélectionner en bloc tous leurs postes
+  // descendants (réaction en chaîne, voir toggleBulk plus haut).
   const renderTree = (nodes: ApiOrgNode[], depth: number): React.ReactNode =>
     nodes.map((node) => {
       const hasKids = node.children.length > 0;
       const canSelect = !selectableType || node.type_service === selectableType;
+      const descendantIds = !canSelect && selectableType ? collectSelectable([node], selectableType).map((n) => n.id) : [];
+      const hasBulkSelection = descendantIds.length > 0;
       const isOpen = search.trim() ? true : openNodes.has(node.id);
-      const isSelected = active.includes(node.id);
+      const isSelected = canSelect ? active.includes(node.id) : hasBulkSelection && descendantIds.every((id) => active.includes(id));
+      const isPartiallySelected = !canSelect && hasBulkSelection && !isSelected && descendantIds.some((id) => active.includes(id));
       return (
         <div key={node.id}>
           <div
             role="button"
             tabIndex={0}
-            onClick={() => (canSelect ? toggle(node.id) : hasKids && toggleOpen(node.id))}
+            onClick={() => {
+              if (canSelect) toggle(node.id);
+              else if (hasBulkSelection) toggleBulk(descendantIds);
+              else if (hasKids) toggleOpen(node.id);
+            }}
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
               if (canSelect) toggle(node.id);
+              else if (hasBulkSelection) toggleBulk(descendantIds);
               else if (hasKids) toggleOpen(node.id);
             }}
             style={{ paddingLeft: `${12 + depth * 14}px` }}
@@ -219,9 +246,13 @@ export function OrgTreeMultiSelect({
             ) : (
               <span className="h-4 w-4 shrink-0" />
             )}
-            {canSelect && (
-              <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors", isSelected ? "border-primary bg-primary" : "border-muted-foreground/40")}>
+            {(canSelect || hasBulkSelection) && (
+              <span className={cn(
+                "flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
+                isSelected ? "border-primary bg-primary" : isPartiallySelected ? "border-primary bg-primary/30" : "border-muted-foreground/40",
+              )}>
                 {isSelected && <Check className="h-3 w-3 text-white" />}
+                {isPartiallySelected && <span className="h-0.5 w-2 rounded-sm bg-primary" />}
               </span>
             )}
             <span className="flex-1 truncate text-left">{canSelect ? nodeLabel(node) : node.nom}</span>

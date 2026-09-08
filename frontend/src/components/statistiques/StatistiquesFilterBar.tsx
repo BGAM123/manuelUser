@@ -62,14 +62,25 @@ export function StatistiquesFilterBar({
         <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           {t("stats.filter.structure")}
         </Label>
-        <OrgTreeMultiSelect
-          value={filters.organigrammeServiceIds}
-          onChange={(ids) => onChangeFilter("organigrammeServiceIds", ids)}
-          rootServiceId={rootServiceId}
-          placeholder={isAdmin ? t("stats.filter.allStructures") : t("stats.filter.myService")}
-          searchPlaceholder={t("stats.filter.searchStructure")}
-          deferApply
-        />
+        {isAdmin ? (
+          <OrgTreeMultiSelect
+            value={filters.organigrammeServiceIds}
+            onChange={(ids) => onChangeFilter("organigrammeServiceIds", ids)}
+            rootServiceId={rootServiceId}
+            selectableType="Poste"
+            placeholder={t("stats.filter.allStructures")}
+            searchPlaceholder={t("stats.filter.searchStructure")}
+            deferApply
+          />
+        ) : (
+          // Non-admin : il est déjà scopé à son propre service côté serveur
+          // (StatisticsService::buildSecuredFilters) — inutile de lui laisser
+          // cliquer un sélecteur pour "filtrer" sur ce qu'il voit déjà ;
+          // affichage statique en lecture seule (demande explicite 2026-09-04).
+          <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            <span className="truncate">{connectedUser?.service?.nom ?? t("stats.filter.myService")}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Filtre 2 : Catégorie + Type imbriqué (arbre, multi-sélection) ── */}

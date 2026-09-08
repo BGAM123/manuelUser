@@ -83,7 +83,13 @@ nelmio_api_doc:
               description: API unique de gestion du stock des biens patrimoniaux (résumé, statistiques, biens, mouvements, historique).
             - name: Amortissements
               description: Gestion des amortissements et dépréciations des biens patrimoniaux.
-          
+            - name: PatrimoineGlobal
+              description: Vue consolidée et structurée de l'ensemble du patrimoine et des consommables.
+            - name: Comptables
+              description: Rapports comptables et états récapitulatifs mensuels.
+            - name: Comptable 2
+              description: Fiche de détenteur - biens et consomptibles réellement détenus par un utilisateur, prêts pour l'édition d'une fiche de détenteur.
+
               
         # ---------------------------------------------------
 
@@ -213,4 +219,7 @@ nelmio_api_doc:
             - ^/gestion_stock_comsomtible
             - ^/amortissements
             - ^/inventory-campaigns
-            
+            - ^/patrimoine_global
+            - ^/comptables
+            - ^/rapports
+            - ^/fiche-detenteur

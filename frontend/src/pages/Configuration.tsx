@@ -75,6 +75,8 @@ import {
   updateUser,
   deleteUser,
   forceDeleteUser,
+  restoreUsers,
+
   resetUserPassword,
   getUserPermissions,
   type ApiUser,
@@ -100,6 +102,9 @@ import { CategoriesBienSection } from "@/components/config/CategoriesBienSection
 import { ExitTypesSection } from "@/components/config/ExitTypesSection";
 import { SecurisationsSection } from "@/components/config/SecurisationsSection";
 import { LogsSection } from "@/components/config/LogsSection";
+import { CanAccess } from "@/components/auth/CanAccess";
+import { AccessDenied } from "@/components/shared/AccessDenied";
+import { ADMIN_ITEM_PERMISSIONS } from "@/utils/navPermissions";
 
 type Section =
   | "orga"
@@ -164,22 +169,24 @@ function ConfigShell() {
     <AppShell>
       <ViewShell title={t("configuration.title")} subtitle={t("configuration.subtitle")}>
         <div className="min-w-0">
-          {section === "users" && <UsersSection view={view} setView={setView} />}
-          {section === "orga" && <OrganigrammeSection />}
-          {section === "permissions" && <PermissionsSection />}
-          {section === "roles" && <RolesSection />}
-          {section === "groupes" && <GroupesSection />}
-          {section === "categories" && <CategoriesBienSection />}
-          {section === "types" && <AssetTypesSection />}
-          {section === "subtypes" && <AssetSubtypesSection />}
-          {section === "cartographie" && <CartographieSection />}
-          {section === "projets" && <ProjetsSection />}
-          {section === "etatBiens" && <EtatBiensSection />}
-          {section === "champs" && <ChampsSection />}
-          {section === "exitTypes" && <ExitTypesSection />}
-          {section === "securisations" && <SecurisationsSection />}
-          {section === "notifications" && <NotificationsSection />}
-          {section === "logs" && <LogsSection />}
+          <CanAccess anyOf={ADMIN_ITEM_PERMISSIONS[section] ?? []} fallback={<AccessDenied />}>
+            {section === "users" && <UsersSection view={view} setView={setView} />}
+            {section === "orga" && <OrganigrammeSection />}
+            {section === "permissions" && <PermissionsSection />}
+            {section === "roles" && <RolesSection />}
+            {section === "groupes" && <GroupesSection />}
+            {section === "categories" && <CategoriesBienSection />}
+            {section === "types" && <AssetTypesSection />}
+            {section === "subtypes" && <AssetSubtypesSection />}
+            {section === "cartographie" && <CartographieSection />}
+            {section === "projets" && <ProjetsSection />}
+            {section === "etatBiens" && <EtatBiensSection />}
+            {section === "champs" && <ChampsSection />}
+            {section === "exitTypes" && <ExitTypesSection />}
+            {section === "securisations" && <SecurisationsSection />}
+            {section === "notifications" && <NotificationsSection />}
+            {section === "logs" && <LogsSection />}
+          </CanAccess>
         </div>
       </ViewShell>
     </AppShell>
@@ -331,7 +338,22 @@ function UsersSection({ view, setView }: { view: SectionView; setView: (v: Secti
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
+  // ── Mutation : restauration d'utilisateurs supprimés ──────────────────
+  // POST /users/restore — le corps contient un tableau d'IDs. Les
+  // utilisateurs non supprimés sont ignorés côté backend (skipped).
+  const restoreMutation = useMutation({
+    mutationFn: (ids: number[]) => restoreUsers(ids),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      const restored = res.data?.restored?.length ?? 0;
+      if (restored > 0) toast.success(res.message ?? t("toast.saved"));
+      else toast.error(res.message ?? t("toast.error"));
+    },
+    onError: reportUserError,
+  });
+
   const columns: Column<ApiUser>[] = [
+
     {
       key: "nom",
       label: t("common.name"),
@@ -379,14 +401,19 @@ function UsersSection({ view, setView }: { view: SectionView; setView: (v: Secti
       key: "is_active",
       label: t("common.status"),
       render: (u) => (
-        <label className="flex cursor-pointer items-center gap-2">
-          <Switch
-            checked={u.is_active}
-            disabled={toggleMutation.isPending}
-            onCheckedChange={(checked) => toggleMutation.mutate({ user: u, is_active: checked })}
-          />
-          <span className="text-xs font-medium">{u.is_active ? t("status.active") : t("common.inactive")}</span>
-        </label>
+        <CanAccess
+          permission="creation_utilisateur"
+          fallback={<span className="text-xs font-medium">{u.is_active ? t("status.active") : t("common.inactive")}</span>}
+        >
+          <label className="flex cursor-pointer items-center gap-2">
+            <Switch
+              checked={u.is_active}
+              disabled={toggleMutation.isPending}
+              onCheckedChange={(checked) => toggleMutation.mutate({ user: u, is_active: checked })}
+            />
+            <span className="text-xs font-medium">{u.is_active ? t("status.active") : t("common.inactive")}</span>
+          </label>
+        </CanAccess>
       ),
       exportFormat: (u) => (u.is_active ? t("status.active") : t("common.inactive")),
     },
@@ -394,18 +421,27 @@ function UsersSection({ view, setView }: { view: SectionView; setView: (v: Secti
       key: "twoFactorEnabled",
       label: t("users.field.twoFactorShort"),
       render: (u) => (
-        <label className="flex cursor-pointer items-center gap-2">
-          <Switch
-            checked={u.twoFactorEnabled ?? false}
-            disabled={toggle2FAMutation.isPending}
-            onCheckedChange={(checked) =>
-              toggle2FAMutation.mutate({ user: u, twoFactorEnabled: checked })
-            }
-          />
-          <span className="text-xs font-medium">
-            {u.twoFactorEnabled ? t("profile.twoFactor.on") : t("profile.twoFactor.off")}
-          </span>
-        </label>
+        <CanAccess
+          permission="creation_utilisateur"
+          fallback={
+            <span className="text-xs font-medium">
+              {u.twoFactorEnabled ? t("profile.twoFactor.on") : t("profile.twoFactor.off")}
+            </span>
+          }
+        >
+          <label className="flex cursor-pointer items-center gap-2">
+            <Switch
+              checked={u.twoFactorEnabled ?? false}
+              disabled={toggle2FAMutation.isPending}
+              onCheckedChange={(checked) =>
+                toggle2FAMutation.mutate({ user: u, twoFactorEnabled: checked })
+              }
+            />
+            <span className="text-xs font-medium">
+              {u.twoFactorEnabled ? t("profile.twoFactor.on") : t("profile.twoFactor.off")}
+            </span>
+          </label>
+        </CanAccess>
       ),
       exportFormat: (u) =>
         u.twoFactorEnabled ? t("profile.twoFactor.on") : t("profile.twoFactor.off"),
@@ -446,15 +482,17 @@ function UsersSection({ view, setView }: { view: SectionView; setView: (v: Secti
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">{t("config.users")}</h2>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setSelected(null);
-                setView("creation");
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("action.add")}
-            </Button>
+            <CanAccess permission="creation_utilisateur">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setSelected(null);
+                  setView("creation");
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("action.add")}
+              </Button>
+            </CanAccess>
           </div>
 
           <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -506,55 +544,92 @@ function UsersSection({ view, setView }: { view: SectionView; setView: (v: Secti
             exportTitle="MINEPIA — Utilisateurs"
             searchKeys={["firstName", "lastName", "email"]}
             rowActions={(u) => (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-                    aria-label={t("common.actions")}
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {u.is_active ? (
-                    <>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setSelected(u);
-                          setView("edition");
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" /> {t("action.edit")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setDetenteurTarget(u)}>
-                        <User className="mr-2 h-4 w-4" /> {t("users.action.ficheDetenteur")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setResetTarget(u)}>
-                        <KeyRound className="mr-2 h-4 w-4" /> {t("users.action.resetPassword")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onSelect={() => setLogicalDeleteTarget(u)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" /> {t("users.action.softDelete")}
-                      </DropdownMenuItem>
-                    </>
-                  ) : (
-                    <>
-                      <DropdownMenuItem onSelect={() => toggleMutation.mutate({ user: u, is_active: true })}>
-                        <RotateCcw className="mr-2 h-4 w-4" /> {t("users.action.reactivate")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onSelect={() => setDeleteTarget(u)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" /> {t("common.permanentDelete")}
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <CanAccess anyOf={["creation_utilisateur", "attribution_profil", "liste_utilisateur"]}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                      aria-label={t("common.actions")}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {showDeletedUsers ? (
+                      // Corbeille — un utilisateur supprimé logiquement ne
+                      // peut être que restauré (POST /users/restore) ou
+                      // supprimé définitivement.
+                      <>
+                        <CanAccess permission="creation_utilisateur">
+                          <DropdownMenuItem
+                            disabled={restoreMutation.isPending}
+                            onSelect={() => restoreMutation.mutate([u.id])}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" /> {t("action.restore")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                        <CanAccess permission="creation_utilisateur">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={() => setDeleteTarget(u)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> {t("common.permanentDelete")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                      </>
+                    ) : u.is_active ? (
+
+                      <>
+                        <CanAccess permission="creation_utilisateur">
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setSelected(u);
+                              setView("edition");
+                            }}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" /> {t("action.edit")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                        <CanAccess permission="liste_utilisateur">
+                          <DropdownMenuItem onSelect={() => setDetenteurTarget(u)}>
+                            <User className="mr-2 h-4 w-4" /> {t("users.action.ficheDetenteur")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                        <CanAccess permission="attribution_profil">
+                          <DropdownMenuItem onSelect={() => setResetTarget(u)}>
+                            <KeyRound className="mr-2 h-4 w-4" /> {t("users.action.resetPassword")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                        <CanAccess permission="creation_utilisateur">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={() => setLogicalDeleteTarget(u)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> {t("users.action.softDelete")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                      </>
+                    ) : (
+                      <>
+                        <CanAccess permission="creation_utilisateur">
+                          <DropdownMenuItem onSelect={() => toggleMutation.mutate({ user: u, is_active: true })}>
+                            <RotateCcw className="mr-2 h-4 w-4" /> {t("users.action.reactivate")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                        <CanAccess permission="creation_utilisateur">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={() => setDeleteTarget(u)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> {t("common.permanentDelete")}
+                          </DropdownMenuItem>
+                        </CanAccess>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CanAccess>
             )}
           />
         </div>

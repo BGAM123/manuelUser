@@ -41,6 +41,7 @@ import {
 import { useT } from "@/utils/i18n";
 import { cn } from "@/utils/utils";
 import { Switch } from "@/components/ui/switch";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   getCategorieHierarchie,
   getCategoryById,
@@ -183,7 +184,7 @@ function SubtypeNode({
                 <RotateCcw className="h-3 w-3" />
               </button>
             ) : (
-              <>
+              <CanAccess permission="creation_categorie">
                 <button
                   type="button"
                   title={t("categoriesTree.editSubtypeTitle")}
@@ -200,7 +201,7 @@ function SubtypeNode({
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
-              </>
+              </CanAccess>
             )}
           </div>
         </div>
@@ -309,7 +310,7 @@ function TypeNode({
                 <RotateCcw className="h-3.5 w-3.5" />
               </button>
             ) : (
-              <>
+              <CanAccess permission="creation_categorie">
                 <button
                   type="button"
                   title={t("categoriesTree.addSubtypeTitle")}
@@ -334,7 +335,7 @@ function TypeNode({
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
-              </>
+              </CanAccess>
             )}
           </div>
         </div>
@@ -466,7 +467,7 @@ function CategoryNode({
                 <RotateCcw className="h-3.5 w-3.5" />
               </button>
             ) : (
-              <>
+              <CanAccess permission="creation_categorie">
                 <button
                   type="button"
                   title={t("categoriesTree.addTypeTitle")}
@@ -491,7 +492,7 @@ function CategoryNode({
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
-              </>
+              </CanAccess>
             )}
           </div>
         </div>
@@ -1033,13 +1034,15 @@ export function CategoriesBienSection() {
             <Switch checked={showDeleted} onCheckedChange={setShowDeleted} />
             {t("consumables.showDeleted")}
           </label>
-          <Button
-            size="sm"
-            className="gap-2"
-            onClick={() => setDialog({ mode: "createCategory" })}
-          >
-            <Plus className="h-3.5 w-3.5" /> {t("categories.create")}
-          </Button>
+          <CanAccess permission="creation_categorie">
+            <Button
+              size="sm"
+              className="gap-2"
+              onClick={() => setDialog({ mode: "createCategory" })}
+            >
+              <Plus className="h-3.5 w-3.5" /> {t("categories.create")}
+            </Button>
+          </CanAccess>
         </div>
       </div>
 
@@ -1089,14 +1092,16 @@ export function CategoriesBienSection() {
         <div className="flex h-48 flex-col items-center justify-center gap-3 text-muted-foreground">
           <FolderOpen className="h-10 w-10 opacity-30" />
           <p className="text-sm">{t("categoriesTree.empty")}</p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDialog({ mode: "createCategory" })}
-            className="gap-1"
-          >
-            <Plus className="h-4 w-4" /> {t("categoriesTree.createCategoryButton")}
-          </Button>
+          <CanAccess permission="creation_categorie">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDialog({ mode: "createCategory" })}
+              className="gap-1"
+            >
+              <Plus className="h-4 w-4" /> {t("categoriesTree.createCategoryButton")}
+            </Button>
+          </CanAccess>
         </div>
       ) : displayed.length === 0 ? (
         <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">

@@ -3,8 +3,10 @@
 namespace App\Controller\Consumables;
 
 use App\Entity\Consumable;
+use App\Entity\User;
 use App\Exception\ValidationFailedException;
 use App\Repository\ConsumableRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableService;
 use App\Service\UploadedFilesNormalizer;
@@ -14,6 +16,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -40,6 +43,7 @@ final class UpdateConsumableController extends AbstractController
                         new OA\Property(property: 'nom', type: 'string', nullable: true),
                         new OA\Property(property: 'description', type: 'string', nullable: true),
                         new OA\Property(property: 'quantite', type: 'number', nullable: true, description: 'Quantité modifiable'),
+                        new OA\Property(property: 'unite_mesure', type: 'string', nullable: true, example: 'Paquet', description: 'Unité de mesure du consommable (ex: Paquet, Kg, Litre, etc.)'),
                         new OA\Property(property: 'prixInitial', type: 'number', nullable: true, description: 'Prix unitaire initial'),
                         new OA\Property(property: 'prixTotal', type: 'number', nullable: true, description: 'Prix total'),
                         new OA\Property(property: 'category_id', type: 'integer', nullable: true),
@@ -54,13 +58,15 @@ final class UpdateConsumableController extends AbstractController
             new OA\JsonContent(example: ['nom' => 'Papier A4 Premium', 'description' => 'Papier format A4 90g/m²']),
         ]
     )]
-    #[OA\Response(response: 200, description: 'Success', content: new OA\JsonContent(example: ['success' => true, 'status' => 200, 'message' => 'Consomptible mis à jour avec succès.', 'data' => ['id' => 1]]))]
+    #[OA\Response(response: 200, description: 'Success', content: new OA\JsonContent(example: ['success' => true, 'status' => 200, 'message' => 'Consomptible mis à jour avec succès.', 'data' => ['id' => 1, 'unite_mesure' => 'Paquet']]))]
     #[OA\Response(response: 400, description: 'Validation', content: new OA\JsonContent(example: ['success' => false, 'status' => 400, 'message' => 'La validation a échoué.', 'data' => null]))]
     #[OA\Response(response: 404, description: 'Not Found', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le consomptible demandé est introuvable.', 'data' => null]))]
     public function __invoke(
         int $id,
         Request $request,
+        #[CurrentUser] User $user,
         ConsumableRepository $consumableRepository,
+        ConsumableAccessChecker $accessChecker,
         ConsumableService $consumableService,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
@@ -72,6 +78,8 @@ final class UpdateConsumableController extends AbstractController
         if ($consumable->isDelete()) {
             return $apiResponse->error('Ce consomptible est supprimé.', Response::HTTP_CONFLICT);
         }
+
+        $accessChecker->assertCanAccessConsumable($user, $consumable);
 
         $contentType = (string) $request->headers->get('Content-Type', '');
         if (str_contains($contentType, 'application/json')) {
@@ -85,6 +93,14 @@ final class UpdateConsumableController extends AbstractController
             $payload = $request->request->all();
             $documents = UploadedFilesNormalizer::fromRequest($request, 'piecesJointes');
             $documentLabels = UploadedFilesNormalizer::nullableStringListFromRequest($request, 'piecesJointesNoms');
+        }
+
+        // Un utilisateur normal ne peut pas réaffecter le consomptible à un autre service.
+        if (!empty($payload['service_id']) && !$accessChecker->canAccessServiceId($user, (int) $payload['service_id'])) {
+            return $apiResponse->error(
+                "Vous ne pouvez pas affecter ce consomptible à un autre service que le vôtre.",
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         try {

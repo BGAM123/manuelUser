@@ -11,6 +11,7 @@ import { useTheme } from "@/components/theme/ThemeProvider";
 import { loginApi, verifyOtpApi } from "@/api/authentication/auth.api";
 import api from "@/api/axios";
 import { USER_KEY } from "@/api/axios";
+import { emitAuthChanged } from "@/utils/authEvents";
 import type { AuthUser } from "@/api/authentication/auth.api";
 import type { ApiResponse } from "@/api/types";
 import {
@@ -223,6 +224,7 @@ function SignInView({ onOtpRequired }: { onOtpRequired: (email: string) => void 
           // qui fait planter tout lecteur ultérieur (JSON.parse dessus).
           if (res.data?.data) {
             localStorage.setItem(USER_KEY, JSON.stringify(res.data.data));
+            emitAuthChanged();
           }
         })
         .catch(() => { /* silencieux */ });
@@ -230,12 +232,34 @@ function SignInView({ onOtpRequired }: { onOtpRequired: (email: string) => void 
       toast.success(t("auth.loginSuccess"));
       navigate("/statistiques", { replace: true });
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number } };
+      const axiosErr = err as {
+        response?: { status?: number; data?: unknown };
+        code?: string;
+        message?: string;
+      };
+      // Diagnostic : la cause exacte (statut HTTP, code réseau) reste dans la
+      // console pour pouvoir distinguer un vrai refus serveur d'un problème
+      // de réseau / proxy côté hébergement.
+      console.error("[login] échec", {
+        status: axiosErr.response?.status,
+        code: axiosErr.code,
+        message: axiosErr.message,
+        data: axiosErr.response?.data,
+      });
       if (axiosErr.response?.status === 401) {
         toast.error(t("auth.invalidCredentials"));
+      } else if (axiosErr.message === "INVALID_API_RESPONSE") {
+        toast.error(
+          "Réponse inattendue du serveur d'authentification (aperçu). Réessayez ou utilisez l'application publiée.",
+        );
       } else {
-        toast.error(t("auth.serverUnreachable"));
+        const detail = axiosErr.response?.status
+          ? `HTTP ${axiosErr.response.status}`
+          : (axiosErr.code ?? axiosErr.message ?? "réseau");
+        toast.error(`${t("auth.serverUnreachable")} (${detail})`);
       }
+
+
     } finally {
       setLoading(false);
     }
@@ -353,6 +377,7 @@ function OtpView({ email, onBack }: { email: string; onBack: () => void }) {
           // qui fait planter tout lecteur ultérieur (JSON.parse dessus).
           if (res.data?.data) {
             localStorage.setItem(USER_KEY, JSON.stringify(res.data.data));
+            emitAuthChanged();
           }
         })
         .catch(() => { /* silencieux */ });

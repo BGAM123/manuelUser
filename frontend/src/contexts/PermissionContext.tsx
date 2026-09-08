@@ -15,6 +15,7 @@ import {
 import { USER_KEY } from "@/api/axios";
 import type { AuthUser } from "@/api/authentication/auth.api";
 import { getRoleById } from "@/api/roles/roles.api";
+import { AUTH_CHANGED_EVENT } from "@/utils/authEvents";
 
 interface PermissionContextValue {
   /** Noms techniques des permissions effectives (dédupliqués). */
@@ -99,9 +100,11 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
 
     const handler = () => load();
     window.addEventListener("storage", handler);
+    window.addEventListener(AUTH_CHANGED_EVENT, handler);
     return () => {
       cancelled = true;
       window.removeEventListener("storage", handler);
+      window.removeEventListener(AUTH_CHANGED_EVENT, handler);
     };
   }, [trigger]);
 

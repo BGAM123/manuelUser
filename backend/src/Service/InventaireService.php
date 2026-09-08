@@ -160,6 +160,7 @@ final class InventaireService
                             'categorie' => [
                                 'id' => $category->getId(),
                                 'nom' => $category->getNom(),
+                                'ordre' =>$category->getOrdre()
                             ],
                             'biens' => [],
                         ];
@@ -168,6 +169,13 @@ final class InventaireService
                 }
             }
         }
+
+        // Trier les catégories par ordre
+        uasort($grouped, function ($a, $b) {
+            $ordreA = $a['categorie']['ordre'] ?? PHP_INT_MAX;
+            $ordreB = $b['categorie']['ordre'] ?? PHP_INT_MAX;
+            return $ordreA <=> $ordreB;
+        });
 
         // Retourner comme liste (pas de clés numériques)
         return array_values($grouped);
@@ -257,6 +265,7 @@ final class InventaireService
                 'duree' => $this->calculateProjectDuration($assetProject->getDateDebut(), $assetProject->getDateFinPrevue()),
             ];
         }
+        
 
         // Extraire l'année d'acquisition
         $anneeAcquisition = null;
@@ -274,8 +283,45 @@ final class InventaireService
             'description' => $asset->getDescription(),
             'imputation_budgetaire' => $asset->getValeur() ? (float) $asset->getValeur() : null,
             'projet' => $project,
+            'champs' => $this->buildChamps($asset), 
             'detenteur' => $detenteur,
         ];
+    }
+
+    private function buildChamps(Asset $asset): array
+    {
+        $result = [];
+
+        // ✅ Récupérer les champs du bien
+        foreach ($asset->getChamps() as $champ) {
+            if ($champ->isDelete()) {
+                continue;
+            }
+
+            // ✅ Récupérer les inputs du champ
+            $inputs = [];
+            foreach ($champ->getInputs() as $input) {
+                if (!$input->isDelete()) {
+                    $inputs[] = [
+                        'id' => $input->getId(),
+                        'valeur' => $input->getValeur(),
+                        // 'createdAt' => $input->getCreatedAt()?->format('Y-m-d H:i:s'),
+                        // 'updatedAt' => $input->getUpdatedAt()?->format('Y-m-d H:i:s'),
+                    ];
+                }
+            }
+
+            $result[] = [
+                'id' => $champ->getId(),
+                'nom' => $champ->getNom(),
+                // 'type' => $champ->getType(),
+                // 'sousType' => $champ->getSubtype(),
+                // 'option' => $champ->getOption(),
+                'inputs' => $inputs,
+            ];
+        }
+
+        return $result;
     }
 
     /**

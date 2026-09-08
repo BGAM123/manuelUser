@@ -43,6 +43,7 @@ import { DataTable, RowIconButton, type Column } from "@/components/shared/DataT
 import { SearchableMultiSelect } from "@/components/shared/SearchableMultiSelect";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listEtatBiens,
   createEtatBien,
@@ -247,15 +248,17 @@ export function EtatBiensSection() {
       <div>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">{t("config.etatBiens")}</h2>
-          <Button
-            className="gap-2"
-            onClick={() => {
-              setSelected(null);
-              setView("form");
-            }}
-          >
-            <Plus className="h-4 w-4" /> {t("etatBiens.create")}
-          </Button>
+          <CanAccess permission="creation_etat_bien">
+            <Button
+              className="gap-2"
+              onClick={() => {
+                setSelected(null);
+                setView("form");
+              }}
+            >
+              <Plus className="h-4 w-4" /> {t("etatBiens.create")}
+            </Button>
+          </CanAccess>
         </div>
 
         {/* Filtres */}
@@ -287,13 +290,15 @@ export function EtatBiensSection() {
           searchKeys={["nom"]}
           rowActions={(eb) =>
             eb.is_delete ? (
-              <RowIconButton
-                icon={RotateCcw}
-                label={t("action.restore")}
-                onClick={() => restoreMutation.mutate(eb.id)}
-              />
+              <CanAccess permission="creation_etat_bien">
+                <RowIconButton
+                  icon={RotateCcw}
+                  label={t("action.restore")}
+                  onClick={() => restoreMutation.mutate(eb.id)}
+                />
+              </CanAccess>
             ) : (
-              <>
+              <CanAccess permission="creation_etat_bien">
                 <RowIconButton
                   icon={Pencil}
                   label={t("action.edit")}
@@ -308,7 +313,7 @@ export function EtatBiensSection() {
                   tone="danger"
                   onClick={() => setDeleteTarget(eb)}
                 />
-              </>
+              </CanAccess>
             )
           }
         />

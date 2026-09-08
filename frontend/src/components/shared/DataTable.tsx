@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/utils";
@@ -90,6 +90,15 @@ export function DataTable<T>({
   const total = sorted.length;
   const start = (page - 1) * pageSize;
   const paged = sorted.slice(start, start + pageSize);
+
+  // Si le jeu de données change (changement de filtre, corbeille affichée
+  // puis masquée, suppression, recherche…) et que la page courante n'existe
+  // plus, on revient à la première page. Sans ça, le tableau restait vide
+  // jusqu'à un rechargement manuel de la page.
+  useEffect(() => {
+    if (page > 1 && start >= total) setPage(1);
+  }, [page, start, total]);
+
 
   const toggleSort = (key: string) => {
     setSort((s) =>

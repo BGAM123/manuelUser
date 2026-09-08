@@ -96,6 +96,7 @@ final class CreateAssetController extends AbstractController
                     new OA\Property(property: 'modeAcquisition', type: 'string', nullable: true, example: 'Achat'),
                     new OA\Property(property: 'statut', type: 'string', nullable: true, example: 'ACTIF'),
                     new OA\Property(property: 'quantiteStock', type: 'integer', nullable: true, example: 100, description: 'Optionnel. À renseigner uniquement pour un bien de type stock/consomptible (fournitures, matériel de réunion, etc.). Décrémenté automatiquement par les sorties BSP.'),
+                    new OA\Property(property: 'unite_mesure', type: 'string', nullable: true, example: 'Unité', description: 'Unité de mesure du bien (ex: Unité, Kg, Litre, etc.)'),
                     new OA\Property(property: 'typeFournisseur', type: 'string', nullable: true, example: 'ENTREPRISE'),
                     new OA\Property(property: 'fournisseurNom', type: 'string', nullable: true, example: 'CAMTEL TECHNOLOGIES'),
                     new OA\Property(property: 'fournisseurEmail', type: 'string', nullable: true, example: 'contact@camtel-technologies.cm'),
@@ -128,10 +129,22 @@ final class CreateAssetController extends AbstractController
                         description: "Un nom par document, même index. Ex. piecesJointesNoms[0]=Facture d'achat, piecesJointesNoms[1]=Bon de livraison. Si omis → nom original du fichier. Swagger peut aussi envoyer une seule chaîne CSV qui sera découpée automatiquement.",
                         example: ["Facture d'achat", 'Bon de livraison']
                     ),
+                    new OA\Property(
+                        property: 'securityPiecesJointes[]',
+                        type: 'array',
+                        items: new OA\Items(type: 'string', format: 'binary'),
+                        description: 'Upload multiple de documents pour la sécurisation automatique (si securityMode est fourni)'
+                    ),
+                    new OA\Property(
+                        property: 'securityPiecesJointesNoms[]',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        description: 'Noms personnalisés des documents de sécurisation (même index que securityPiecesJointes)'
+                    ),
                     new OA\Property(property: 'latitude', type: 'number', format: 'float', nullable: true, example: 48.8566, description: 'Optionnel. Doit être fourni avec longitude. Plage: -90 à 90.'),
                     new OA\Property(property: 'longitude', type: 'number', format: 'float', nullable: true, example: 2.3522, description: 'Optionnel. Doit être fourni avec latitude. Plage: -180 à 180.'),
                     new OA\Property(property: 'securityMode', type: 'string', nullable: true, example: 'ARMOIRE', description: 'Mode de sécurisation du bien. Si fourni, crée automatiquement une sécurisation avec la date du jour.'),
-                    new OA\Property(property: 'user_restitution_id', type: 'integer', nullable: true, example: 8, description: 'Optionnel. ID de l\'utilisateur de restitution par défaut pour ce bien.'),
+                    new OA\Property(property: 'service_restitution_id', type: 'integer', nullable: true, example: 16, description: 'Optionnel. ID du service de restitution par défaut pour ce bien.'),
                 ]
             )
         )
@@ -148,6 +161,8 @@ final class CreateAssetController extends AbstractController
                     'id' => 1,
                     'reference' => 'PAT-2026-00001',
                     'nom' => 'Ordinateur Portable HP ProBook 450 G10',
+                    'unite_mesure' => 'Unité',
+                    'quantiteStock' => 100,
                     // 'exercice' => 2026,
                     'photos' => [
                         ['id' => 15, 'nom' => 'photo1.jpg', 'chemin' => '/uploads/assets/photos/photo1_abc.jpg'],
@@ -199,8 +214,12 @@ final class CreateAssetController extends AbstractController
             $documentLabels = UploadedFilesNormalizer::nullableStringListFromRequest($request, 'documents_labels');
         }
 
+        // ✅ Récupérer les pièces jointes de sécurisation
+        $securityDocuments = UploadedFilesNormalizer::fromRequest($request, 'securityPiecesJointes');
+        $securityDocumentLabels = UploadedFilesNormalizer::nullableStringListFromRequest($request, 'securityPiecesJointesNoms');
+
         try {
-            $asset = $assetManagementService->create($payload, $photos, $documents, $documentLabels, $champsExistants, $champsNouveaux, $champsValeurs, $currentUser);
+            $asset = $assetManagementService->create($payload, $photos, $documents, $documentLabels, $champsExistants, $champsNouveaux, $champsValeurs, $currentUser, $securityDocuments, $securityDocumentLabels);
         } catch (ValidationFailedException $e) {
             $errors = $e->getErrors();
             // Doublon de référence → 409 plutôt que 400

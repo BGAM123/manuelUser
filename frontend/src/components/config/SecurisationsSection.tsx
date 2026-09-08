@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listSecurities, deleteSecurity, type ApiSecurity,
 } from "@/api/securities/securities.api";
@@ -139,7 +140,9 @@ export function SecurisationsSection() {
             exportTitle="MINEPIA — Biens sécurisés"
             searchKeys={["securityMode", "dateSecurisation"]}
             rowActions={(s) => (
-              <RowIconButton icon={Trash2} label={t("action.delete")} tone="danger" onClick={() => setDeleteTarget(s)} />
+              <CanAccess permission="parametrage_securite">
+                <RowIconButton icon={Trash2} label={t("action.delete")} tone="danger" onClick={() => setDeleteTarget(s)} />
+              </CanAccess>
             )}
           />
         )}

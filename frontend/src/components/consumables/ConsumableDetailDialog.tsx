@@ -59,6 +59,7 @@ import {
 } from "@/api/consumables/consumable-transfers.api";
 import type { ApiOrgNode } from "@/api/services/services.api";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 
 function formatQty(n: number) {
   return n.toLocaleString("fr-FR");
@@ -276,14 +277,16 @@ export function ConsumableDetailDialog({
               <h3 className="text-sm font-semibold text-foreground">{t("consumables.transfers")}</h3>
               <div className="flex items-center gap-2">
                 {!showForm && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => setShowForm(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" /> {t("consumables.newTransfer")}
-                  </Button>
+                  <CanAccess permission="creation_transfert_consomptible">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => setShowForm(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> {t("consumables.newTransfer")}
+                    </Button>
+                  </CanAccess>
                 )}
               </div>
             </div>
@@ -374,17 +377,19 @@ export function ConsumableDetailDialog({
                             )}
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                title={t("action.delete")}
-                                disabled={deleteMutation.isPending}
-                                onClick={() => setDeleteTarget(tr.id)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                            <CanAccess permission="suppression_transfert_consomptible">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  title={t("action.delete")}
+                                  disabled={deleteMutation.isPending}
+                                  onClick={() => setDeleteTarget(tr.id)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </CanAccess>
                           </td>
                         </tr>
                       );

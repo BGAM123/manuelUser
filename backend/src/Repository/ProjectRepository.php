@@ -64,6 +64,32 @@ class ProjectRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
     }
 
+    /**
+     * Récupère tous les projets expirés (date de fin prévue dépassée).
+     * 
+     * Un projet est considéré comme expiré si :
+     * - Il n'est pas supprimé (isDelete = false)
+     * - Il a une date de fin prévue renseignée (dateFinPrevue IS NOT NULL)
+     * - La date de fin prévue est antérieure à aujourd'hui (dateFinPrevue < aujourd'hui)
+     * 
+     * Cette méthode est utilisée par la commande de restitution automatique
+     * pour identifier les projets dont les biens doivent être restitués.
+     * 
+     * @return array<int, Project> Liste des projets expirés
+     */
+    public function findExpiredProjects(): array
+    {
+        $today = new \DateTimeImmutable('today');
+
+        return $this->createQueryBuilder('p')
+            ->where('p.isDelete = false')
+            ->andWhere('p.dateFinPrevue IS NOT NULL')
+            ->andWhere('p.dateFinPrevue < :today')
+            ->setParameter('today', $today)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function countProjects(?string $q = null, ?string $statut = null, ?string $exercice = null, ?string $isDelete = 'false'): int
     {
         $qb = $this->createQueryBuilder('p')

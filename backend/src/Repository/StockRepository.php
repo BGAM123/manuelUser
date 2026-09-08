@@ -25,23 +25,23 @@ class StockRepository extends ServiceEntityRepository
         // 1. Vérifier si le bien est supprimé
         $sql = "SELECT is_delete, statut FROM asset WHERE id = {$assetIdEscaped}";
         $row = $conn->executeQuery($sql)->fetchAssociative();
-        
+
         if (!$row || $row['is_delete']) {
             return null;
         }
 
-        // 2. Vérifier si le bien est SORTI (statut SORTIE OU AssetExit OU BSP non retourné)
+        // 2. Vérifier si le bien est SORTI (statut SORTIS OU AssetExit OU BSP non retourné)
         $sql = "SELECT COUNT(*) FROM asset a
                 WHERE a.id = {$assetIdEscaped}
                 AND (
-                    a.statut = 'SORTIE'
+                    a.statut IN ('SORTIS', 'SORTIE')
                     OR EXISTS (SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0)
                     OR EXISTS (
                         SELECT 1 FROM asset_exit ae2
                         INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                        WHERE ae2.asset_id = a.id 
-                        AND ae2.is_delete = 0 
-                        AND b.is_delete = 0 
+                        WHERE ae2.asset_id = a.id
+                        AND ae2.is_delete = 0
+                        AND b.is_delete = 0
                         AND b.retour = 0
                     )
                 )";
@@ -61,8 +61,8 @@ class StockRepository extends ServiceEntityRepository
 
         // 4. Vérifier affectation active (avec user_id OU service_id)
         $sql = "SELECT COUNT(*) FROM asset_assignment aa
-                WHERE aa.asset_id = {$assetIdEscaped} 
-                AND aa.is_delete = 0 
+                WHERE aa.asset_id = {$assetIdEscaped}
+                AND aa.is_delete = 0
                 AND aa.date_fin IS NULL
                 AND (aa.user_id IS NOT NULL OR aa.service_id IS NOT NULL)";
         $hasAssignment = $conn->executeQuery($sql)->fetchOne();
@@ -94,16 +94,16 @@ class StockRepository extends ServiceEntityRepository
 
         // Condition par défaut : exclure les biens sortis, SAUF si un filtre statut est fourni
         if (!isset($filters['statut'])) {
-            $whereConditions[] = "a.statut != 'SORTIE'";
+            $whereConditions[] = "a.statut NOT IN ('SORTIS', 'SORTIE')";
         }
 
         $whereConditions[] = "NOT EXISTS (SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0)";
         $whereConditions[] = "NOT EXISTS (
                 SELECT 1 FROM asset_exit ae2
                 INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                WHERE ae2.asset_id = a.id 
-                AND ae2.is_delete = 0 
-                AND b.is_delete = 0 
+                WHERE ae2.asset_id = a.id
+                AND ae2.is_delete = 0
+                AND b.is_delete = 0
                 AND b.retour = 0
             )";
 
@@ -159,7 +159,7 @@ class StockRepository extends ServiceEntityRepository
                 LIMIT {$limitEscaped} OFFSET {$offsetEscaped}";
 
         $assetsData = $conn->executeQuery($sql)->fetchAllAssociative();
-        
+
         // Convertir en objets Asset
         $assetObjects = [];
         foreach ($assetsData as $assetData) {
@@ -186,16 +186,16 @@ class StockRepository extends ServiceEntityRepository
 
         // Condition par défaut : exclure les biens sortis, SAUF si un filtre statut est fourni
         if (!isset($filters['statut'])) {
-            $whereConditions[] = "a.statut != 'SORTIE'";
+            $whereConditions[] = "a.statut NOT IN ('SORTIS', 'SORTIE')";
         }
 
         $whereConditions[] = "NOT EXISTS (SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0)";
         $whereConditions[] = "NOT EXISTS (
                 SELECT 1 FROM asset_exit ae2
                 INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                WHERE ae2.asset_id = a.id 
-                AND ae2.is_delete = 0 
-                AND b.is_delete = 0 
+                WHERE ae2.asset_id = a.id
+                AND ae2.is_delete = 0
+                AND b.is_delete = 0
                 AND b.retour = 0
             )";
 
@@ -308,14 +308,14 @@ class StockRepository extends ServiceEntityRepository
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 WHERE a.is_delete = 0 {$exerciceFilter}
                 AND (
-                    a.statut = 'SORTIE'
+                    a.statut IN ('SORTIS', 'SORTIE')
                     OR EXISTS (SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0)
                     OR EXISTS (
                         SELECT 1 FROM asset_exit ae2
                         INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                        WHERE ae2.asset_id = a.id 
-                        AND ae2.is_delete = 0 
-                        AND b.is_delete = 0 
+                        WHERE ae2.asset_id = a.id
+                        AND ae2.is_delete = 0
+                        AND b.is_delete = 0
                         AND b.retour = 0
                     )
                 )";
@@ -326,7 +326,7 @@ class StockRepository extends ServiceEntityRepository
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 WHERE a.is_delete = 0 {$exerciceFilter}
                 AND (
-                    a.statut = 'SORTIE'
+                    a.statut IN ('SORTIS', 'SORTIE')
                     OR EXISTS (SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0)
                 )";
         $results['sorties_definitives'] = (int) $conn->executeQuery($sql)->fetchOne();
@@ -335,13 +335,13 @@ class StockRepository extends ServiceEntityRepository
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 INNER JOIN asset_exit ae ON a.id = ae.asset_id
                 INNER JOIN bsp b ON ae.id = b.asset_exit_id
-                WHERE a.is_delete = 0 
-                AND a.statut != 'SORTIE'
-                AND ae.is_delete = 0 
-                AND b.is_delete = 0 
+                WHERE a.is_delete = 0
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
+                AND ae.is_delete = 0
+                AND b.is_delete = 0
                 AND b.retour = 0
                 AND NOT EXISTS (
-                    SELECT 1 FROM asset_exit ae2 
+                    SELECT 1 FROM asset_exit ae2
                     WHERE ae2.asset_id = a.id AND ae2.is_delete = 0
                 )
                 {$exerciceFilter}";
@@ -358,7 +358,7 @@ class StockRepository extends ServiceEntityRepository
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 INNER JOIN asset_maintenance_link aml ON a.id = aml.asset_id
                 INNER JOIN asset_maintenance am ON aml.maintenance_id = am.id
-                WHERE a.is_delete = 0 
+                WHERE a.is_delete = 0
                 AND am.date_recuperation IS NULL
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0
@@ -366,12 +366,12 @@ class StockRepository extends ServiceEntityRepository
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae2
                     INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                    WHERE ae2.asset_id = a.id 
-                    AND ae2.is_delete = 0 
-                    AND b.is_delete = 0 
+                    WHERE ae2.asset_id = a.id
+                    AND ae2.is_delete = 0
+                    AND b.is_delete = 0
                     AND b.retour = 0
                 )
-                AND a.statut != 'SORTIE'
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
                 {$exerciceFilter}";
         $results['maintenance'] = (int) $conn->executeQuery($sql)->fetchOne();
 
@@ -380,8 +380,8 @@ class StockRepository extends ServiceEntityRepository
         // =====================================================
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 INNER JOIN asset_assignment aa ON a.id = aa.asset_id
-                WHERE a.is_delete = 0 
-                AND aa.is_delete = 0 
+                WHERE a.is_delete = 0
+                AND aa.is_delete = 0
                 AND aa.date_fin IS NULL
                 AND (aa.user_id IS NOT NULL OR aa.service_id IS NOT NULL)
                 AND NOT EXISTS (
@@ -395,12 +395,12 @@ class StockRepository extends ServiceEntityRepository
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae2
                     INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                    WHERE ae2.asset_id = a.id 
-                    AND ae2.is_delete = 0 
-                    AND b.is_delete = 0 
+                    WHERE ae2.asset_id = a.id
+                    AND ae2.is_delete = 0
+                    AND b.is_delete = 0
                     AND b.retour = 0
                 )
-                AND a.statut != 'SORTIE'
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
                 {$exerciceFilter}";
         $results['affectes'] = (int) $conn->executeQuery($sql)->fetchOne();
 
@@ -409,9 +409,9 @@ class StockRepository extends ServiceEntityRepository
         // =====================================================
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 INNER JOIN asset_assignment aa ON a.id = aa.asset_id
-                WHERE a.is_delete = 0 
-                AND aa.is_delete = 0 
-                AND aa.date_fin IS NULL 
+                WHERE a.is_delete = 0
+                AND aa.is_delete = 0
+                AND aa.date_fin IS NULL
                 AND aa.user_id IS NOT NULL
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_maintenance_link aml
@@ -424,12 +424,12 @@ class StockRepository extends ServiceEntityRepository
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae2
                     INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                    WHERE ae2.asset_id = a.id 
-                    AND ae2.is_delete = 0 
-                    AND b.is_delete = 0 
+                    WHERE ae2.asset_id = a.id
+                    AND ae2.is_delete = 0
+                    AND b.is_delete = 0
                     AND b.retour = 0
                 )
-                AND a.statut != 'SORTIE'
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
                 {$exerciceFilter}";
         $results['affectes_utilisateurs'] = (int) $conn->executeQuery($sql)->fetchOne();
 
@@ -438,9 +438,9 @@ class StockRepository extends ServiceEntityRepository
         // =====================================================
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 INNER JOIN asset_assignment aa ON a.id = aa.asset_id
-                WHERE a.is_delete = 0 
-                AND aa.is_delete = 0 
-                AND aa.date_fin IS NULL 
+                WHERE a.is_delete = 0
+                AND aa.is_delete = 0
+                AND aa.date_fin IS NULL
                 AND aa.service_id IS NOT NULL
                 AND aa.user_id IS NULL
                 AND NOT EXISTS (
@@ -454,20 +454,20 @@ class StockRepository extends ServiceEntityRepository
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae2
                     INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                    WHERE ae2.asset_id = a.id 
-                    AND ae2.is_delete = 0 
-                    AND b.is_delete = 0 
+                    WHERE ae2.asset_id = a.id
+                    AND ae2.is_delete = 0
+                    AND b.is_delete = 0
                     AND b.retour = 0
                 )
-                AND a.statut != 'SORTIE'
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
                 {$exerciceFilter}";
         $results['affectes_services'] = (int) $conn->executeQuery($sql)->fetchOne();
 
         // =====================================================
         // 8. NON AFFECTÉS (dans le patrimoine, pas maintenance, pas affecté)
         // =====================================================
-        $results['non_affectes'] = $results['total_patrimoine'] 
-            - $results['maintenance'] 
+        $results['non_affectes'] = $results['total_patrimoine']
+            - $results['maintenance']
             - $results['affectes'];
 
         // =====================================================
@@ -476,16 +476,16 @@ class StockRepository extends ServiceEntityRepository
         $sql = "SELECT COUNT(DISTINCT a.id) FROM asset a
                 WHERE a.is_delete = 0
                 AND a.statut = 'ACTIF'
-                AND a.statut != 'SORTIE'
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0
                 )
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae2
                     INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                    WHERE ae2.asset_id = a.id 
-                    AND ae2.is_delete = 0 
-                    AND b.is_delete = 0 
+                    WHERE ae2.asset_id = a.id
+                    AND ae2.is_delete = 0
+                    AND b.is_delete = 0
                     AND b.retour = 0
                 )
                 {$exerciceFilter}";
@@ -526,18 +526,18 @@ class StockRepository extends ServiceEntityRepository
                 FROM asset a
                 INNER JOIN asset_assignment aa ON a.id = aa.asset_id
                 INNER JOIN user u ON aa.user_id = u.id
-                WHERE a.is_delete = 0 
-                AND aa.is_delete = 0 
-                AND aa.date_fin IS NULL 
+                WHERE a.is_delete = 0
+                AND aa.is_delete = 0
+                AND aa.date_fin IS NULL
                 AND aa.user_id IS NOT NULL
-                AND a.statut != 'SORTIE'
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
                 AND NOT EXISTS (SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0)
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae2
                     INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                    WHERE ae2.asset_id = a.id 
-                    AND ae2.is_delete = 0 
-                    AND b.is_delete = 0 
+                    WHERE ae2.asset_id = a.id
+                    AND ae2.is_delete = 0
+                    AND b.is_delete = 0
                     AND b.retour = 0
                 )
                 AND NOT EXISTS (
@@ -556,19 +556,19 @@ class StockRepository extends ServiceEntityRepository
                 FROM asset a
                 INNER JOIN asset_assignment aa ON a.id = aa.asset_id
                 INNER JOIN service s ON aa.service_id = s.id
-                WHERE a.is_delete = 0 
-                AND aa.is_delete = 0 
-                AND aa.date_fin IS NULL 
+                WHERE a.is_delete = 0
+                AND aa.is_delete = 0
+                AND aa.date_fin IS NULL
                 AND aa.service_id IS NOT NULL
                 AND aa.user_id IS NULL
-                AND a.statut != 'SORTIE'
+                AND a.statut NOT IN ('SORTIS', 'SORTIE')
                 AND NOT EXISTS (SELECT 1 FROM asset_exit ae WHERE ae.asset_id = a.id AND ae.is_delete = 0)
                 AND NOT EXISTS (
                     SELECT 1 FROM asset_exit ae2
                     INNER JOIN bsp b ON ae2.id = b.asset_exit_id
-                    WHERE ae2.asset_id = a.id 
-                    AND ae2.is_delete = 0 
-                    AND b.is_delete = 0 
+                    WHERE ae2.asset_id = a.id
+                    AND ae2.is_delete = 0
+                    AND b.is_delete = 0
                     AND b.retour = 0
                 )
                 AND NOT EXISTS (
@@ -606,7 +606,7 @@ class StockRepository extends ServiceEntityRepository
         $sql = "SELECT COUNT(*)
         FROM asset a
         WHERE a.is_delete = 0
-        AND a.statut NOT IN ('INACTIF', 'SORTIE')
+        AND a.statut NOT IN ('INACTIF', 'SORTIS', 'SORTIE')
         {$exerciceFilter}";
         $actifs = (int) $conn->executeQuery($sql)->fetchOne();
 
@@ -725,32 +725,32 @@ class StockRepository extends ServiceEntityRepository
                 FROM asset_assignment aa
                 INNER JOIN asset a ON aa.asset_id = a.id
                 WHERE aa.is_delete = 0
-                
+
                 UNION ALL
-                
+
                 SELECT 'MAINTENANCE' as type, am.id, a.id as asset_id, a.nom as asset_nom,
                 am.date_intervention as date_debut, am.date_recuperation as date_fin, am.created_at
                 FROM asset_maintenance am
                 INNER JOIN asset_maintenance_link aml ON am.id = aml.maintenance_id
                 INNER JOIN asset a ON aml.asset_id = a.id
-                
+
                 UNION ALL
-                
+
                 SELECT 'EXIT' as type, ae.id, a.id as asset_id, a.nom as asset_nom,
                 ae.date_sortie as date_debut, NULL as date_fin, ae.created_at
                 FROM asset_exit ae
                 INNER JOIN asset a ON ae.asset_id = a.id
                 WHERE ae.is_delete = 0
-                
+
                 UNION ALL
-                
+
                 SELECT 'BSP' as type, b.id, a.id as asset_id, a.nom as asset_nom,
                 b.date_etablissement as date_debut, b.date_retour_effective as date_fin, b.created_at
                 FROM bsp b
                 INNER JOIN asset_exit ae ON b.asset_exit_id = ae.id
                 INNER JOIN asset a ON ae.asset_id = a.id
                 WHERE b.is_delete = 0
-                
+
                 ORDER BY created_at DESC
                 LIMIT {$limitEscaped} OFFSET {$offsetEscaped}";
 
@@ -790,20 +790,20 @@ class StockRepository extends ServiceEntityRepository
             SELECT 'ASSIGNMENT' as type, aa.created_at
             FROM asset_assignment aa
             WHERE aa.is_delete = 0
-            
+
             UNION ALL
-            
+
             SELECT 'MAINTENANCE' as type, am.created_at
             FROM asset_maintenance am
-            
+
             UNION ALL
-            
+
             SELECT 'EXIT' as type, ae.created_at
             FROM asset_exit ae
             WHERE ae.is_delete = 0
-            
+
             UNION ALL
-            
+
             SELECT 'BSP' as type, b.created_at
             FROM bsp b
             WHERE b.is_delete = 0

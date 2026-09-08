@@ -12,7 +12,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use App\Entity\User;
 
 #[Route('/consumable-transfers')]
 #[OA\Tag(name: 'Consomptibles-Transferts')]
@@ -33,6 +34,7 @@ final class CreateConsumableTransferController extends AbstractController
                 properties: [
                     new OA\Property(property: 'type', type: 'string', enum: ['TRANSFERT_DIRECT', 'BSP'], example: 'TRANSFERT_DIRECT', description: 'Obligatoire : TRANSFERT_DIRECT ou BSP'),
                     new OA\Property(property: 'consumable_id', type: 'integer', example: 1, description: 'Obligatoire'),
+                    new OA\Property(property: 'service_source_id', type: 'integer', nullable: true, example: 12, description: 'Optionnel, réservé aux administrateurs : service qui possède le stock à transférer. Pour un utilisateur lambda, le service connecté est toujours utilisé.'),
                     new OA\Property(property: 'service_destination_id', type: 'integer', example: 16, description: 'Service destinataire (obligatoire)'),
                     new OA\Property(property: 'quantite', type: 'number', example: 500, description: 'Obligatoire'),
                     new OA\Property(property: 'dateTransfert', type: 'string', format: 'date', nullable: true, example: '2026-08-16'),
@@ -67,13 +69,11 @@ final class CreateConsumableTransferController extends AbstractController
         Request $request,
         ConsumableTransferService $consumableTransferService,
         ApiResponseFactory $apiResponse,
-        TokenStorageInterface $tokenStorage
+        #[CurrentUser] User $currentUser
     ): JsonResponse {
         $payload = $request->request->all();
         $documents = UploadedFilesNormalizer::fromRequest($request, 'piecesJointes');
         $documentLabels = UploadedFilesNormalizer::nullableStringListFromRequest($request, 'piecesJointesNoms');
-
-        $currentUser = $tokenStorage->getToken()?->getUser();
 
         try {
             if (!array_key_exists('type', $payload) || $payload['type'] === null) {

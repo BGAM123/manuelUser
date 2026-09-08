@@ -3,13 +3,16 @@
 namespace App\Controller\Consumables;
 
 use App\Entity\Consumable;
+use App\Entity\User;
 use App\Repository\ConsumableRepository;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -55,13 +58,17 @@ final class ConsumableDetailController extends AbstractController
     #[OA\Response(response: 404, description: 'Not Found', content: new OA\JsonContent(example: ['success' => false, 'status' => 404, 'message' => 'Le consomptible demandé est introuvable.', 'data' => null]))]
     public function __invoke(
         int $id,
+        #[CurrentUser] User $user,
         ConsumableRepository $consumableRepository,
+        ConsumableAccessChecker $accessChecker,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
         $consumable = $consumableRepository->getActiveById($id);
         if (!$consumable instanceof Consumable) {
             return $apiResponse->error('Le consomptible demandé est introuvable.', Response::HTTP_NOT_FOUND);
         }
+
+        $accessChecker->assertCanAccessConsumable($user, $consumable);
 
         // Stock global du consomptible (quantité initiale/entrées - transferts + retours -
         // consommé), pas la vue par service : c'est la même formule que celle persistée dans

@@ -8,6 +8,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { StatTab } from "./types";
+import { useCanAccess } from "@/hooks/useCanAccess";
 import { MINEPIA_GREEN } from "./mock-stats-data";
 import { useT, type Key } from "@/utils/i18n";
 
@@ -44,6 +45,13 @@ export function StatNavigationTabs({
   counts,
 }: StatNavigationTabsProps) {
   const t = useT();
+  // Onglet "global" accessible avec l'une ou l'autre permission (vue
+  // d'ensemble) ; les onglets détaillés (véhicules, terrains...) exigent
+  // spécifiquement consultation_statistiques.
+  const { can } = useCanAccess();
+  const canGlobal = can("consultation_tableau_bord") || can("consultation_statistiques");
+  const canDetailed = can("consultation_statistiques");
+  const tabs = BASE_TABS.filter((tab) => (tab.id === "global" ? canGlobal : canDetailed));
   const getBadge = (id: StatTab): string | undefined => {
     // Si counts fournis, on affiche les vraies valeurs (ou "0" si confirmé vide)
     if (counts !== undefined) {
@@ -65,7 +73,7 @@ export function StatNavigationTabs({
   return (
     <div className="flex w-full justify-center overflow-x-auto pb-1 no-scrollbar">
       <div className="flex items-center gap-1.5 p-1 bg-muted/50 rounded-xl border border-border/80 min-w-max">
-        {BASE_TABS.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           const badge = getBadge(tab.id);

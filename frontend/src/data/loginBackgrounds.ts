@@ -2,15 +2,17 @@
  * Configuration des images de fond pour le diaporama de la page de connexion.
  * Images stockées dans : public/login-backgrounds/
  *
- * Pour ajouter ou retirer une image, modifiez simplement ce tableau.
+ * Les noms de fichiers doivent rester simples (sans espaces ni parenthèses) :
+ * certains environnements d'hébergement/prévisualisation renvoient une erreur
+ * 500 sur les URL contenant des caractères encodés (%20, parenthèses).
  */
 export const LOGIN_BACKGROUNDS: string[] = [
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.51.42 (1).jpeg",
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.51.42.jpeg",
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.51.45.jpeg",
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.53.19 (1).jpeg",
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.53.19 (2).jpeg",
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.53.19 (3).jpeg",
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.53.19 (4).jpeg",
-  "/login-backgrounds/WhatsApp Image 2026-08-07 at 15.53.19.jpeg",
+  "/login-backgrounds/minepia-1.jpeg",
+  "/login-backgrounds/minepia-2.jpeg",
+  "/login-backgrounds/minepia-3.jpeg",
+  "/login-backgrounds/minepia-4.jpeg",
+  "/login-backgrounds/minepia-5.jpeg",
+  "/login-backgrounds/minepia-6.jpeg",
+  "/login-backgrounds/minepia-7.jpeg",
+  "/login-backgrounds/minepia-8.jpeg",
 ];

@@ -28,8 +28,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useConnectedUser } from "@/hooks/useConnectedUser";
 import { useT, type Key } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import type { WidgetVisibility } from "./types";
 import { MINEPIA_GREEN } from "./mock-stats-data";
+import { PatrimoineGlobalButton } from "./PatrimoineGlobalButton";
+import { ComptabiliteButton } from "./ComptabiliteButton";
 
 interface StatistiquesHeaderProps {
   periodLabel: string;
@@ -167,32 +170,47 @@ export function StatistiquesHeader({
           <span>{t("action.reset")}</span>
         </Button>
 
-        {/* Menu Export (Excel / PDF) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 gap-1.5 text-xs cursor-pointer shadow-xs"
-            >
-              <Download className="h-3.5 w-3.5 text-emerald-600" />
-              <span>{t("action.export")}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="text-xs">{t("stats.header.exportFormats")}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onExportExcel} className="text-xs cursor-pointer gap-2">
-              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-              <span>{t("stats.header.exportExcelFull")}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportPdf} className="text-xs cursor-pointer gap-2">
-              <FileText className="h-4 w-4 text-red-600" />
-              <span>{t("stats.header.exportPdfSummary")}</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Menu Export (Excel / PDF) — réservé aux profils autorisés à
+            générer des états (permission edition_etat, cf. navPermissions.ts). */}
+        <CanAccess permission="edition_etat">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 text-xs cursor-pointer shadow-xs"
+              >
+                <Download className="h-3.5 w-3.5 text-emerald-600" />
+                <span>{t("action.export")}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="text-xs">{t("stats.header.exportFormats")}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onExportExcel} className="text-xs cursor-pointer gap-2">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                <span>{t("stats.header.exportExcelFull")}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onExportPdf} className="text-xs cursor-pointer gap-2">
+                <FileText className="h-4 w-4 text-red-600" />
+                <span>{t("stats.header.exportPdfSummary")}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CanAccess>
+
+        {/* Export Patrimoine Global (Excel multi-feuilles configurable) —
+            même permission que le menu export ci-dessus (édition d'état). */}
+        <CanAccess permission="edition_etat">
+          <PatrimoineGlobalButton />
+        </CanAccess>
+
+        {/* Documents comptables officiels (Livre Journal, Fiche de détenteur) —
+            réservé aux comptables et à l'administrateur (permission dédiée). */}
+        <CanAccess permission="consultation_comptabilite">
+          <ComptabiliteButton />
+        </CanAccess>
 
         {/* Personnalisation de l'affichage (Pop-up widgets) */}
         <Popover>

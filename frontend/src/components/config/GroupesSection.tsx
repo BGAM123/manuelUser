@@ -53,6 +53,7 @@ import {
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
 import { cn } from "@/utils/utils";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listGroupes,
   createGroupe,
@@ -232,15 +233,17 @@ export function GroupesSection() {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t("config.groupes")}</h2>
-          <Button
-            className="gap-2"
-            onClick={() => {
-              setSelected(null);
-              setView("form");
-            }}
-          >
-            <Plus className="h-4 w-4" /> {t("groupes.create")}
-          </Button>
+          <CanAccess permission="creation_groupe">
+            <Button
+              className="gap-2"
+              onClick={() => {
+                setSelected(null);
+                setView("form");
+              }}
+            >
+              <Plus className="h-4 w-4" /> {t("groupes.create")}
+            </Button>
+          </CanAccess>
         </div>
         <DataTable
           data={groupes}
@@ -250,7 +253,7 @@ export function GroupesSection() {
           exportTitle="MINEPIA — Groupes d'utilisateurs"
           searchKeys={["nom", "description"]}
           rowActions={(g) => (
-            <>
+            <CanAccess permission="creation_groupe">
               <RowIconButton
                 icon={Pencil}
                 label={t("action.edit")}
@@ -273,7 +276,7 @@ export function GroupesSection() {
                 tone="danger"
                 onClick={() => setDeleteTarget(g)}
               />
-            </>
+            </CanAccess>
           )}
         />
       </div>

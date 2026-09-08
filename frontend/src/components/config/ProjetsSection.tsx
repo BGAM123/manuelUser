@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable, RowIconButton, type Column } from "@/components/shared/DataTable";
 import { useT } from "@/utils/i18n";
+import { CanAccess } from "@/components/auth/CanAccess";
 import {
   listProjects,
   createProject,
@@ -170,36 +171,45 @@ export function ProjetsSection() {
       render: (p) => {
         const cfg = STATUT_CONFIG[p.statut];
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-75 focus:outline-none ${cfg.className}`}
-              >
+          <CanAccess
+            permission="creation_source_financement"
+            fallback={
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.className}`}>
                 {STATUT_LABELS[p.statut]}
-                <ChevronDown className="h-3 w-3 opacity-60" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-36">
-              {(["PLANIFIE", "EN_COURS", "TERMINE"] as ProjectStatut[]).map((s) => (
-                <DropdownMenuItem
-                  key={s}
-                  onSelect={() => {
-                    if (s !== p.statut)
-                      statusMutation.mutate({ id: p.id, statut: s });
-                  }}
-                  className="flex items-center justify-between gap-2 text-xs"
+              </span>
+            }
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-75 focus:outline-none ${cfg.className}`}
                 >
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUT_CONFIG[s].className}`}
+                  {STATUT_LABELS[p.statut]}
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-36">
+                {(["PLANIFIE", "EN_COURS", "TERMINE"] as ProjectStatut[]).map((s) => (
+                  <DropdownMenuItem
+                    key={s}
+                    onSelect={() => {
+                      if (s !== p.statut)
+                        statusMutation.mutate({ id: p.id, statut: s });
+                    }}
+                    className="flex items-center justify-between gap-2 text-xs"
                   >
-                    {STATUT_LABELS[s]}
-                  </span>
-                  {s === p.statut && <Check className="h-3.5 w-3.5 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUT_CONFIG[s].className}`}
+                    >
+                      {STATUT_LABELS[s]}
+                    </span>
+                    {s === p.statut && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </CanAccess>
         );
       },
       exportFormat: (p) => STATUT_LABELS[p.statut],
@@ -269,15 +279,17 @@ export function ProjetsSection() {
               <Switch checked={showArchived} onCheckedChange={setShowArchived} />
               {t("categories.showArchived")}
             </label>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setSelected(null);
-                setView("form");
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("admin.fundingSource.create")}
-            </Button>
+            <CanAccess permission="creation_source_financement">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setSelected(null);
+                  setView("form");
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("admin.fundingSource.create")}
+              </Button>
+            </CanAccess>
           </div>
         </div>
         <DataTable
@@ -293,7 +305,7 @@ export function ProjetsSection() {
             </div>
           )}
           rowActions={(p) => (
-            <>
+            <CanAccess permission="creation_source_financement">
               {!showArchived && (
                 <RowIconButton
                   icon={Pencil}
@@ -325,7 +337,7 @@ export function ProjetsSection() {
                   onClick={() => setDeleteTarget(p)}
                 />
               )}
-            </>
+            </CanAccess>
           )}
         />
       </div>

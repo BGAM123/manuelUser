@@ -92,6 +92,16 @@ final class ConsumableService
             unset($payload['description']);
         }
 
+        // Description (optionnel)
+        if (array_key_exists('unite_mesure', $payload)) {
+            if ($payload['unite_mesure'] === null || $payload['unite_mesure'] === '') {
+                $consumable->setUnite_mesure(null);
+            } else {
+                $consumable->setUnite_mesure((string) $payload['unite_mesure']);
+            }
+            unset($payload['unite_mesure']);
+        }
+
         // Catégorie (optionnel)
         if (array_key_exists('category_id', $payload) && $payload['category_id'] !== null && $payload['category_id'] !== '') {
             $category = $this->categoryRepository->getActiveCategoryById((int) $payload['category_id']);
@@ -218,6 +228,15 @@ final class ConsumableService
                 $consumable->setCategory($category);
             }
             unset($payload['category_id']);
+        }
+
+        if (array_key_exists('unite_mesure', $payload)) {
+            if ($payload['unite_mesure'] === null || $payload['unite_mesure'] === '') {
+                $consumable->setUnite_mesure(null);
+            } else {
+                $consumable->setUnite_mesure((string) $payload['unite_mesure']);
+            }
+            unset($payload['unite_mesure']);
         }
 
         // Type de bien

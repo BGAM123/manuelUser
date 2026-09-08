@@ -359,20 +359,20 @@ final class AssetAssignmentService
             $dateDebut = new \DateTime($payload['dateDebut']);
         }
 
-        // ✅ Logique automatique : si user_id non fourni, utiliser userRestitution du bien
-        $userId = $payload['user_id'] ?? null;
-        if (null === $userId) {
-            $userRestitution = $asset->getUserRestitution();
-            if ($userRestitution) {
-                $userId = $userRestitution->getId();
+        // ✅ Logique automatique : si service_id non fourni, utiliser serviceRestitution du bien
+        $serviceId = $payload['service_id'] ?? null;
+        if (null === $serviceId) {
+            $serviceRestitution = $asset->getServiceRestitution();
+            if ($serviceRestitution) {
+                $serviceId = $serviceRestitution->getId();
             }
         }
 
         // ✅ Logique automatique : si affectation en cours, renseigner dateFin (date fournie ou date du jour)
         $lastAssignment = $asset->getAssignments()->last();
         if ($lastAssignment && $lastAssignment->isDetenteur() && null === $lastAssignment->getDateFin()) {
-            $dateFin = isset($payload['dateFin']) && !empty($payload['dateFin']) 
-                ? new \DateTime($payload['dateFin']) 
+            $dateFin = isset($payload['dateFin']) && !empty($payload['dateFin'])
+                ? new \DateTime($payload['dateFin'])
                 : new \DateTime();
             $lastAssignment->setDateFin($dateFin);
             $lastAssignment->setDetenteur(false);
@@ -387,12 +387,12 @@ final class AssetAssignmentService
         $assignment->setDetenteur(true);
         $assignment->setCommentaire($payload['commentaire'] ?? 'Restitution du bien.');
 
-        if ($userId) {
-            $user = $this->userRepository->find($userId);
-            if (!$user) {
-                throw new ResourceNotFoundException('Utilisateur introuvable.');
+        if ($serviceId) {
+            $service = $this->serviceRepository->getServiceById((int) $serviceId);
+            if (!$service) {
+                throw new ResourceNotFoundException('Service introuvable.');
             }
-            $assignment->setUser($user);
+            $assignment->setService($service);
         }
 
         // Définir l'utilisateur créateur si fourni
@@ -404,18 +404,21 @@ final class AssetAssignmentService
         $this->validate($assignment);
         $this->assignmentRepository->save($assignment);
 
-        // ✅ Personnaliser le message de notification pour les restitutions
-        $recipient = $this->resolveRecipient($assignment);
-        if ($recipient) {
-            $this->notificationService->notify(
-                $recipient,
-                Notification::SUBJECT_ASSET_ASSIGNMENT,
-                $assignment->getId(),
-                Notification::TYPE_CREATED,
-                'Restitution de bien',
-                sprintf('Le bien "%s" vous a été restitué.', $assignment->getAsset()?->getNom() ?? ('#' . $assignment->getAsset()?->getId())),
-                $currentUser
-            );
+        // ✅ Notification pour les restitutions : envoyer à tous les utilisateurs du service
+        if ($serviceId && $assignment->getService()) {
+            // Récupérer tous les utilisateurs du service
+            $serviceUsers = $this->userRepository->findBy(['service' => $assignment->getService()]);
+            foreach ($serviceUsers as $user) {
+                $this->notificationService->notify(
+                    $user,
+                    Notification::SUBJECT_ASSET_ASSIGNMENT,
+                    $assignment->getId(),
+                    Notification::TYPE_CREATED,
+                    'Une nouvelle restitution de bien',
+                    sprintf('Le bien "%s" a été restitué à votre service.', $assignment->getAsset()?->getNom() ?? ('#' . $assignment->getAsset()?->getId())),
+                    $currentUser
+                );
+            }
         }
 
         return $assignment;

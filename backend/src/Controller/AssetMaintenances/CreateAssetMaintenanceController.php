@@ -129,7 +129,7 @@ final class CreateAssetMaintenanceController extends AbstractController
             if (!is_array($assetIds)) {
                 $assetIds = [$assetIds];
             }
-            
+
             foreach ($assetIds as $assetId) {
                 // ✅ Utilisation du repository injecté
                 $asset = $this->assetRepository->getActiveById((int) $assetId);
@@ -139,10 +139,10 @@ final class CreateAssetMaintenanceController extends AbstractController
                         Response::HTTP_NOT_FOUND
                     );
                 }
-                
+
                 // Vérifier le seuil
                 $check = $maintenanceService->checkMaintenanceThreshold($asset);
-                
+
                 // if ($check['seuil_defini'] && $check['depasse']) {
                 //     return $apiResponse->error(
                 //         $check['message'],
@@ -155,22 +155,22 @@ final class CreateAssetMaintenanceController extends AbstractController
                 //     );
                 // }
 
-                if ($check['seuil_defini'] && $check['atteint']) {  // ← ICI, bloque si ATTEINT OU DEPASSE
-                    return $apiResponse->error(
-                        $check['message'],
-                        Response::HTTP_BAD_REQUEST,
-                        [
-                            'seuil' => $check['seuil'],
-                            'nombre_maintenances' => $check['nombre_maintenances'],
-                            'restant' => $check['restant']
-                        ]
-                    );
-                }
+                // if ($check['seuil_defini'] && $check['atteint']) {  // ← ICI, bloque si ATTEINT OU DEPASSE
+                //     return $apiResponse->error(
+                //         $check['message'],
+                //         Response::HTTP_BAD_REQUEST,
+                //         [
+                //             'seuil' => $check['seuil'],
+                //             'nombre_maintenances' => $check['nombre_maintenances'],
+                //             'restant' => $check['restant']
+                //         ]
+                //     );
+                // }
             }
-            
+
             // Créer la maintenance
             $maintenance = $maintenanceService->create($payload, $documents, $documentLabels, $currentUser);
-            
+
         } catch (ValidationFailedException $e) {
             return $apiResponse->error('La validation a échoué.', Response::HTTP_BAD_REQUEST, $e->getErrors());
         } catch (ResourceNotFoundException $e) {
@@ -185,15 +185,15 @@ final class CreateAssetMaintenanceController extends AbstractController
 
         // ✅ Ajouter les informations de seuil dans la réponse
         $responseData = $responseBuilder->buildDetail($maintenance);
-        
+
         $thresholdChecks = [];
         foreach ($maintenance->getAssets() as $asset) {
             $thresholdChecks[] = $maintenanceService->checkMaintenanceThreshold($asset);
         }
-        
+
         if (!empty($thresholdChecks)) {
-            $responseData['seuil_verification'] = count($thresholdChecks) === 1 
-                ? $thresholdChecks[0] 
+            $responseData['seuil_verification'] = count($thresholdChecks) === 1
+                ? $thresholdChecks[0]
                 : $thresholdChecks;
         }
 

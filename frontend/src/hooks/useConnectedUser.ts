@@ -8,6 +8,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { USER_KEY } from "@/api/axios";
 import type { AuthUser } from "@/api/authentication/auth.api";
+import { AUTH_CHANGED_EVENT } from "@/utils/authEvents";
 
 function getSnapshot(): string | null {
   return localStorage.getItem(USER_KEY);
@@ -15,7 +16,11 @@ function getSnapshot(): string | null {
 
 function subscribe(cb: () => void) {
   window.addEventListener("storage", cb);
-  return () => window.removeEventListener("storage", cb);
+  window.addEventListener(AUTH_CHANGED_EVENT, cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener(AUTH_CHANGED_EVENT, cb);
+  };
 }
 
 export function useConnectedUser() {

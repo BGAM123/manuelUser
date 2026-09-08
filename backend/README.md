@@ -180,7 +180,9 @@ api_gestion_patrimoine/
 │   │   ├── Regions/
 │   │   ├── Departements/
 │   │   ├── Arrondissements/
-│   │   └── Inventaire/
+│   │   ├── Inventaire/
+│   │   ├── PatrimoineGlobalController.php  # API globale du patrimoine (bloc dédié)
+│   │   └── Stock/
 │   ├── DataFixtures/         # Jeux de données de démo
 │   ├── Entity/               # Modèle Doctrine (34 entités)
 │   ├── EventSubscriber/      # CORS, exceptions JSON
@@ -231,6 +233,7 @@ api_gestion_patrimoine/
 | `GeoFileParserService` | Parsing des fichiers géospatiaux |
 | `InventaireService` | Génération d'inventaires paginés |
 | `StatisticsService` | Calcul de statistiques |
+| `GlobalPatrimoineService` | Agrégation des données globales du patrimoine (biens + consommables) avec filtres et pagination |
 
 ### Authentification (flux)
 
@@ -650,6 +653,31 @@ Sauf mention contraire : **JWT Bearer requis** (`ROLE_USER`).
 | Méthode | Path | Description |
 |---|---|---|
 | `GET` | `/statistics` | Statistiques globales |
+
+### 8.29 API Globale du Patrimoine (Patrimoine Global)
+
+| Méthode | Path | Description |
+|---|---|---|
+| `GET` | `/patrimoine_global` | Vue globale complète (biens + consommables) avec filtres et pagination |
+| `GET` | `/patrimoine_global/biens` | Données globales des biens uniquement |
+| `GET` | `/patrimoine_global/consommables` | Données globales des consommables uniquement |
+
+**Filtres disponibles (query parameters, séparés par virgules) :**
+- `service` : IDs de services
+- `categorie` : IDs de catégories
+- `type` : IDs de types de biens
+- `statut` : Statuts (ACTIF, EN MAINTENANCE, SORTIE...)
+- `etat` : IDs d'états de biens
+- `sousType` : IDs de sous-types de biens
+
+**Pagination :**
+- `page` : Numéro de page (défaut: 1)
+- `limit` : Nombre d'éléments par page (défaut: 10, max: 1000)
+
+**Structure de la réponse :**
+- `BIENS` : Contient les données des biens avec regroupements par état, région, département, arrondissement, service, projet, catégorie, type, et combinaisons
+- `CONSOMMABLES` : Contient les données des consommables avec regroupements par service et catégorie
+- Chaque regroupement inclut un `total` et les données paginées avec `data` et `pagination`
 
 ---
 
@@ -1393,7 +1421,23 @@ php bin/console doctrine:migrations:migrate
 
 ## 14. État d'avancement du projet
 
-### Fonctionnalités récemment implémentées (Août 2026)
+### Fonctionnalités récemment implémentées (Août - Septembre 2026)
+
+#### API Globale du Patrimoine (Nouveau bloc dédié)
+- **Contrôleur dédié** : Création de `PatrimoineGlobalController` avec préfixe de route `/patrimoine_global` pour isoler l'API globale des autres blocs
+- **Endpoints** :
+  - `GET /patrimoine_global` : Vue globale complète (biens + consommables)
+  - `GET /patrimoine_global/biens` : Données des biens uniquement
+  - `GET /patrimoine_global/consommables` : Données des consommables uniquement
+- **Filtres avancés** : Support de filtres multiples (service, categorie, type, statut, etat, sousType) avec IDs séparés par virgules
+- **Pagination** : Intégration complète de la pagination (page, limit) dans tous les regroupements
+- **Structure de réponse** :
+  - `BIENS` : Regroupements par état, région, département, arrondissement, service, projet, catégorie, type, et combinaisons
+  - `CONSOMMABLES` : Regroupements par service et catégorie
+  - Chaque regroupement inclut un `total` et les données paginées avec `data` et `pagination`
+- **Service dédié** : `GlobalPatrimoineService` pour l'agrégation des données avec méthodes de filtrage et pagination
+- **Documentation OpenAPI** : Exemples de réponse enrichis sans blocs vides, documentation complète des filtres et paramètres
+- **Tag Swagger** : Bloc "PatrimoineGlobal" distinct dans la documentation Swagger
 
 #### Consommables
 - **Upload de pièces jointes** : Correction du traitement des fichiers dans `CreateConsumableController` et `UpdateConsumableController` pour utiliser `UploadedFilesNormalizer::parseLabelList()` comme les autres services (AssetExit, AssetMaintenance)

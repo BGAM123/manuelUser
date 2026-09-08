@@ -7,7 +7,7 @@ import { DataTable, RowIconButton, type Column } from "@/components/shared/DataT
 import { StatusBadge, statutTone } from "@/components/shared/StatusBadge";
 import { useViewStack } from "@/hooks/useViewStack";
 import { useT } from "@/utils/i18n";
-import { mockMaintenances, formatFCFA, type Maintenance } from "@/utils/mock-data";
+import { mockMaintenances, formatFCFA, formatAmount, type Maintenance } from "@/utils/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,7 @@ function MaintenanceShell() {
     { key: "unite", label: "Unité", className: "text-xs" },
     { key: "dateBesoin", label: "Date" },
     { key: "priorite", label: "Priorité", render: (r) => <StatusBadge tone={r.priorite === "Haute" ? "urgent" : r.priorite === "Basse" ? "low" : "info"}>{r.priorite}</StatusBadge> },
-    { key: "evaluation", label: "Évaluation", className: "text-right", render: (r) => <span className="tabular-nums">{formatFCFA(r.evaluation)}</span>, exportFormat: (r) => r.evaluation },
+    { key: "evaluation", label: "Évaluation (FCFA)", className: "text-right", render: (r) => <span className="tabular-nums">{formatAmount(r.evaluation)}</span>, exportFormat: (r) => r.evaluation },
     { key: "statut", label: "Statut", render: (r) => <StatusBadge tone={statutTone(r.statut)}>{r.statut}</StatusBadge> },
   ];
 

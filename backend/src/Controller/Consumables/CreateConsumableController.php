@@ -3,7 +3,9 @@
 namespace App\Controller\Consumables;
 
 use App\Entity\Consumable;
+use App\Entity\User;
 use App\Exception\ValidationFailedException;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableService;
 use App\Service\UploadedFilesNormalizer;
@@ -13,6 +15,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -38,6 +41,7 @@ final class CreateConsumableController extends AbstractController
                     new OA\Property(property: 'nom', type: 'string', example: 'Papier A4'),
                     new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Papier format A4 80g/m²'),
                     new OA\Property(property: 'quantite', type: 'number', example: 5000, description: 'Stock de départ (saisi uniquement à la création)'),
+                    new OA\Property(property: 'unite_mesure', type: 'string', nullable: true, example: 'Paquet', description: 'Unité de mesure du consommable (ex: Paquet, Kg, Litre, etc.)'),
                     new OA\Property(property: 'prixInitial', type: 'number', nullable: true, example: 500, description: 'Prix unitaire initial'),
                     new OA\Property(property: 'prixTotal', type: 'number', nullable: true, example: 2500000, description: 'Prix total (quantité × prix unitaire)'),
                     new OA\Property(property: 'category_id', type: 'integer', nullable: true, example: 2),
@@ -61,16 +65,26 @@ final class CreateConsumableController extends AbstractController
             )
         )
     )]
-    #[OA\Response(response: 200, description: 'Success', content: new OA\JsonContent(example: ['success' => true, 'status' => 200, 'message' => 'Consomptible créé avec succès.', 'data' => ['id' => 1]]))]
+    #[OA\Response(response: 200, description: 'Success', content: new OA\JsonContent(example: ['success' => true, 'status' => 200, 'message' => 'Consomptible créé avec succès.', 'data' => ['id' => 1, 'unite_mesure' => 'Paquet']]))]
     #[OA\Response(response: 400, description: 'Validation', content: new OA\JsonContent(example: ['success' => false, 'status' => 400, 'message' => 'La validation a échoué.', 'data' => ['nom' => 'Le nom est obligatoire.']]))]
     public function __invoke(
         Request $request,
+        #[CurrentUser] User $user,
         ConsumableService $consumableService,
+        ConsumableAccessChecker $accessChecker,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
         $payload = $request->request->all();
         $documents = UploadedFilesNormalizer::fromRequest($request, 'piecesJointes');
         $documentLabels = UploadedFilesNormalizer::nullableStringListFromRequest($request, 'piecesJointesNoms');
+
+        // Un utilisateur normal ne peut créer un consomptible que pour son propre service.
+        if (!empty($payload['service_id']) && !$accessChecker->canAccessServiceId($user, (int) $payload['service_id'])) {
+            return $apiResponse->error(
+                "Vous ne pouvez créer un consomptible que pour votre propre service.",
+                Response::HTTP_FORBIDDEN
+            );
+        }
 
         try {
             $consumable = $consumableService->create($payload, $documents, $documentLabels);

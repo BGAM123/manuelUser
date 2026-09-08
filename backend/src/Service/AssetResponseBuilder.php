@@ -181,6 +181,9 @@ final class AssetResponseBuilder
         // ✅ Déterminer si le bien est restitué
         $isRestitue = $this->isAssetRestitue($asset);
 
+        // ✅ Déterminer si le bien doit être restitué (basé sur serviceRestitution)
+        $doitEtreRestitue = $asset->getServiceRestitution() !== null;
+
         // ✅ Calculer l'exercice à partir du projet
         $exercice = null;
         if ($firstProject && !$firstProject->isDelete()) {
@@ -215,6 +218,7 @@ final class AssetResponseBuilder
             'sourceFinancement' => $firstProject && !$firstProject->isDelete() ? $firstProject->getNom() : null,
             'exercice' => $exercice,
             'valeur' => $this->normalizeValeur($asset->getValeur()),
+            'unite_mesure' => $this->normalizeValeur($asset->getUnite_mesure()),
             'valeurInitiale' => $asset->getValeurInitiale(),
             'activeAmortissement' => $asset->isActiveAmortissement(),
             'activeReevaluation' => $asset->isActiveReevaluation(),
@@ -231,6 +235,8 @@ final class AssetResponseBuilder
             'received' => $received,
             // ✅ Ajout du champ isRestitue (dynamique, basé sur l'affectation actuelle)
             'isRestitue' => $isRestitue,
+            // ✅ Ajout du champ doitEtreRestitue (basé sur serviceRestitution)
+            'doitEtreRestitue' => $doitEtreRestitue,
             'location' => $this->resolveLocation($asset),
             'maintenanceEnCours' => $this->resolveOpenMaintenance($asset),
             // 'coutTotalMaintenance' => $this->assetMaintenanceRepository->getTotalMaintenanceCostForAsset($asset),
@@ -313,6 +319,9 @@ final class AssetResponseBuilder
         // ✅ Déterminer si le bien est restitué
         $isRestitue = $this->isAssetRestitue($asset);
 
+        // ✅ Déterminer si le bien doit être restitué (basé sur serviceRestitution)
+        $doitEtreRestitue = $asset->getServiceRestitution() !== null;
+
         $photos = [];
         $documents = [];
         foreach ($asset->getPiecesJointes() as $piece) {
@@ -367,6 +376,7 @@ final class AssetResponseBuilder
             'statut' => $asset->getStatut(),
             'quantiteStock' => $asset->getQuantiteStock(),
             'valeur' => $this->normalizeValeur($asset->getValeur()),
+            'unite_mesure' => $this->normalizeValeur($asset->getUnite_mesure()),
             'valeurInitiale' => $asset->getValeurInitiale(),
             'dateAcquisition' => $asset->getDateAcquisition()?->format('Y-m-d'),
             'exercice' => $exercice,
@@ -376,11 +386,9 @@ final class AssetResponseBuilder
             'activeAmortissement' => $asset->isActiveAmortissement(),
             'activeReevaluation' => $asset->isActiveReevaluation(),
             'activeDepreciation' => $asset->isActiveDepreciation(),
-            'userRestitution' => $asset->getUserRestitution() ? [
-                'id' => $asset->getUserRestitution()->getId(),
-                'firstName' => $asset->getUserRestitution()->getFirstName(),
-                'lastName' => $asset->getUserRestitution()->getLastName(),
-                'matricule' => $asset->getUserRestitution()->getMatricule(),
+            'serviceRestitution' => $asset->getServiceRestitution() ? [
+                'id' => $asset->getServiceRestitution()->getId(),
+                'nom' => $asset->getServiceRestitution()->getNom(),
             ] : null,
             // 'seuil' => $asset->getSeuil(),
             // 'amortissement' => [
@@ -436,6 +444,8 @@ final class AssetResponseBuilder
             'received' => $received,
             // ✅ Ajout du champ isRestitue (dynamique, basé sur l'affectation actuelle)
             'isRestitue' => $isRestitue,
+            // ✅ Ajout du champ doitEtreRestitue (basé sur serviceRestitution)
+            'doitEtreRestitue' => $doitEtreRestitue,
             'coutTotalMaintenance' => $this->assetMaintenanceRepository->getTotalMaintenanceCostForAsset($asset),
             'createdAt' => $asset->getCreatedAt()?->format('Y-m-d H:i:s'),
             'updatedAt' => $asset->getUpdatedAt()?->format('Y-m-d H:i:s'),
@@ -738,6 +748,10 @@ final class AssetResponseBuilder
         return [
             'id' => (int) $user->getId(),
             'name' => trim($user->getFirstName() . ' ' . $user->getLastName()),
+            'service' => $user->getService() ? [
+                'id' => (int) $user->getService()->getId(),
+                'nom' => (string) $user->getService()->getNom(),
+            ] : null,
         ];
     }
 

@@ -3,7 +3,9 @@
 namespace App\Controller\Consumables;
 
 use App\Entity\Consumable;
+use App\Entity\User;
 use App\Exception\ResourceNotFoundException;
+use App\Security\ConsumableAccessChecker;
 use App\Service\ApiResponseFactory;
 use App\Service\ConsumableService;
 use OpenApi\Attributes as OA;
@@ -11,6 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/consumables')]
 #[OA\Tag(name: 'Consomptibles')]
@@ -29,9 +32,13 @@ final class DeleteConsumablePieceJointeController extends AbstractController
     public function __invoke(
         Consumable $consumable,
         int $pjId,
+        #[CurrentUser] User $user,
+        ConsumableAccessChecker $accessChecker,
         ConsumableService $consumableService,
         ApiResponseFactory $apiResponse
     ): JsonResponse {
+        $accessChecker->assertCanAccessConsumable($user, $consumable);
+
         if ($consumable->isDelete()) {
             return $apiResponse->error('Ce consomptible est supprimé.', Response::HTTP_CONFLICT);
         }

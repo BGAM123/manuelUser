@@ -62,9 +62,15 @@ export async function markNotificationRead(id: number): Promise<ApiResponse<null
   return response.data;
 }
 
-/** POST /asset-assignments/{id}/acknowledge — accuser réception d'une affectation de bien. */
+/**
+ * POST /asset-assignments/acknowledge-batch — accuser réception d'une
+ * affectation de bien. Il n'existe pas de route unitaire
+ * POST /asset-assignments/{id}/acknowledge côté backend (confirmé en lisant
+ * AcknowledgeAssetAssignmentController.php) : on réutilise la route batch
+ * avec un seul id.
+ */
 export async function acknowledgeAssetAssignment(id: number): Promise<ApiResponse<null>> {
-  const response = await api.post<ApiResponse<null>>(`/asset-assignments/${id}/acknowledge`);
+  const response = await api.post<ApiResponse<null>>(`/asset-assignments/acknowledge-batch`, { ids: String(id) });
   return response.data;
 }
 

@@ -145,17 +145,19 @@ export interface ApiBien {
   assignmentId?: number;
   detenteur?: boolean;
   /**
-   * Utilisateur de restitution par défaut pour ce bien (préremplissage du
+   * Service de restitution par défaut pour ce bien (préremplissage du
    * formulaire) — présent sur GET /assets et GET /assets/{id}, peut être
-   * null si aucun n'a été défini.
+   * null si aucun n'a été défini. À l'issue de la date de fin de la source
+   * de financement liée au bien, celui-ci est restitué automatiquement à ce
+   * service (logique 100% backend, voir AssetAssignmentService::restituerAsset).
+   * Remplace l'ancien champ "utilisateur de restitution" (user_restitution_id),
+   * qui n'est plus celui accepté par le backend (2026-09-01).
    */
-  userRestitution?: {
-    id: number;
-    firstName: string;
-    lastName: string;
-  } | null;
+  serviceRestitution?: { id: number; nom: string } | null;
   /** true si le bien a déjà été restitué (POST /assets/{id}/restituer). */
   isRestitue?: boolean;
+  /** true si un service de restitution a été défini sur ce bien (sera restitué automatiquement à la fin du financement). */
+  doitEtreRestitue?: boolean;
 }
 
 // ─── Payload de création/modification ──────────────────────────────────────
@@ -195,8 +197,12 @@ export interface CreateBienPayload {
   etat_bien_id?: number;
   service_id: number;
   user_id?: number;       // prioritaire sur service_id si fourni
-  /** Optionnel. ID de l'utilisateur de restitution par défaut pour ce bien. */
-  user_restitution_id?: number;
+  /**
+   * Optionnel. ID du service de restitution par défaut pour ce bien —
+   * remplace user_restitution_id (le backend n'accepte plus un utilisateur,
+   * confirmé sur POST /assets, POST /assets/{id} et POST /assets/{id}/restituer).
+   */
+  service_restitution_id?: number;
   project_ids?: number[];
   // Localisation (Terrains/Bâtiments) — POST /assets et POST /assets/{id}
   // acceptent directement latitude/longitude dans la même requête (voir
@@ -234,6 +240,8 @@ export interface ListBiensParams {
   project_id?: number | string;
   /** true = accusé de réception effectué par le détenteur actuel, false = non accusé, absent = tous. */
   received?: boolean;
+  /** true = biens ayant un service de restitution défini (restituables), false = sans, absent = tous. */
+  restituable?: boolean;
 }
 
 // ─── Construction du FormData ───────────────────────────────────────────────
@@ -269,7 +277,7 @@ function buildFormData(payload: CreateBienPayload, isUpdate = false): FormData {
   fd.append("etat_bien_id", String(payload.etat_bien_id));
   fd.append("service_id", String(payload.service_id));
   if (payload.user_id) fd.append("user_id", String(payload.user_id));
-  if (payload.user_restitution_id) fd.append("user_restitution_id", String(payload.user_restitution_id));
+  if (payload.service_restitution_id) fd.append("service_restitution_id", String(payload.service_restitution_id));
 
   // Recommandation 6.a — sous-type de bien (si sélectionné)
   if (payload.asset_sub_type_id) {
@@ -560,14 +568,11 @@ export function normalizeBien(raw: any): ApiBien {
     securise:   raw.securise   ?? false,
     coutTotalMaintenance: raw.coutTotalMaintenance ?? null,
     received: raw.received ?? null,
-    userRestitution: raw.userRestitution
-      ? {
-          id: raw.userRestitution.id,
-          firstName: raw.userRestitution.firstName ?? raw.userRestitution.prenom ?? "",
-          lastName: raw.userRestitution.lastName ?? raw.userRestitution.nom ?? "",
-        }
+    serviceRestitution: raw.serviceRestitution
+      ? { id: raw.serviceRestitution.id, nom: raw.serviceRestitution.nom ?? raw.serviceRestitution.name ?? "" }
       : null,
     isRestitue: raw.isRestitue ?? undefined,
+    doitEtreRestitue: raw.doitEtreRestitue ?? undefined,
   };
 }
 
@@ -731,12 +736,13 @@ export async function restoreBien(id: number): Promise<ApiBien> {
 /**
  * POST /assets/{id}/restituer — Restitue un bien : crée une affectation de
  * type RESTITUTION. Confirmé en lisant AssetAssignmentService::restituerAsset
- * directement (pas juste le Swagger) : SEULS user_id/dateDebut/dateFin/
- * commentaire sont acceptés — pas de service_id (la restitution ne définit
- * aucun service sur l'affectation créée).
+ * directement (pas juste le Swagger, 2026-09-01) : SEUL service_id (optionnel
+ * — si absent, utilise le serviceRestitution déjà défini sur le bien),
+ * dateDebut, dateFin et commentaire sont acceptés. user_id n'est PAS/PLUS
+ * accepté par cet endpoint (remplacé par service_id).
  */
 export interface RestituerBienPayload {
-  user_id: number;
+  service_id?: number;
   dateDebut?: string;
   dateFin?: string;
   commentaire?: string;
