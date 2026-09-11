@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>{% block title %}Email{% endblock %}</title>
+
+        {# Custom CSS #}
+		<link href="{{ app.request.schemeAndHttpHost ~ '/assets/emails/css/style.css' }}" rel="stylesheet">
+
+        {% block stylesheets %}
+			{#  #}
+		{% endblock %}
+    </head>
+
+    <body>
+        <div class="email-container">
+            {% block body %}
+                {#  #}
+            {% endblock %}
+            
+            {# Footer Section #}
+            <div class="email-footer">
+                <p>Need help? Contact us:</p>
+                <a href="mailto:{{ app_support_mail }}">{{ app_support_mail }}</a> | 
+                <a href="{{ app_front_url_contact }}">Contact Page</a>
+            </div>
+        </div>
+        
+        {% block javascripts %}
+            {#  #}
+        {% endblock %}
+    </body>
+
+</html>

@@ -223,3 +223,5 @@ nelmio_api_doc:
             - ^/comptables
             - ^/rapports
             - ^/fiche-detenteur
+            - ^/ordre_sortie
+            - ^/comptables/etat-appreciatif

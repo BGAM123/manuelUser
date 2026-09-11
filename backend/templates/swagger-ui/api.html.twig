@@ -1,0 +1,24 @@
+{% extends 'layouts/base_swagger-ui.html.twig' %}
+
+{% block title %}
+	APIs Documentation
+{% endblock %}
+
+{% block stylesheets %}
+	<style>
+		div.wrapper .block h3{
+			display: none;
+		}
+	</style>
+{% endblock %}
+
+{% block body %}
+    <script>
+        window.onload = function() {
+            SwaggerUIBundle({
+                url: "/swagger/Api.json",
+                dom_id: '#swagger-ui',
+            });
+        };
+    </script>
+{% endblock %}

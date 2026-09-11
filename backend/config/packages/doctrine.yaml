@@ -8,13 +8,6 @@ doctrine:
 
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
-
-        default_table_options:
-            charset: utf8mb4
-            collate: utf8mb4_unicode_ci
-
-        types:
-            point: App\Doctrine\DBAL\Types\PointType
     orm:
         auto_generate_proxy_classes: true
         enable_lazy_ghost_objects: true
@@ -39,13 +32,6 @@ when@test:
         dbal:
             # "TEST_TOKEN" is typically set by ParaTest
             dbname_suffix: '_test%env(default::TEST_TOKEN)%'
-            # Le serveur de développement limite les index InnoDB à 1000 octets.
-            # utf8 (3 octets) permet au schéma de test d'indexer les colonnes
-            # uniques de 255 caractères sans modifier le schéma de production.
-            default_table_options:
-                charset: utf8
-                collate: utf8_unicode_ci
-                row_format: DYNAMIC
 
 when@prod:
     doctrine:

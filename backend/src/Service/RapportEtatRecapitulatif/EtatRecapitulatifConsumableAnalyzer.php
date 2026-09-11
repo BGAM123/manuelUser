@@ -63,12 +63,12 @@ final class EtatRecapitulatifConsumableAnalyzer
         // Prix unitaire
         $prixUnitaire = $consumable->getPrixInitial() ? (float) $consumable->getPrixInitial() : 0;
 
-        // 1. Stock au début de la période (avant $periodeDebut)
+        // 1. Stock pendant la période ($periodeDebut à $periodeFin)
         $stockAuEntre = $this->stockCalculator->calculateStockForConsumableAtDate(
             $consumableId,
             $serviceIds,
             $periodeDebut,
-            'before'
+            $periodeFin
         );
         $stockAuEntre['valeur'] = $stockAuEntre['quantite'] * $prixUnitaire;
 
@@ -99,8 +99,8 @@ final class EtatRecapitulatifConsumableAnalyzer
         return [
             'designation' => $consumable->getNom(),
             'prixUnitaire' => $prixUnitaire,
-            'stockAuEntre' => $stockAuEntre,
-            'stockAuSortie' => $stockAuSortie,
+            'stockAuSortie' => $stockAuEntre,
+            'stockAuEntre' => $stockAuSortie,
             'entrees' => $entrees,
             'sorties' => $sorties,
         ];

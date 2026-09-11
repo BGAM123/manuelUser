@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Courrier de Départ - Service - MINEPIA</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 650px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px 25px;
+        }
+        .greeting {
+            font-size: 16px;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #7c3aed;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #a78bfa;
+            display: flex;
+            align-items: center;
+        }
+        .section-title .icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        .info-list {
+            background-color: #f9fafb;
+            border-left: 4px solid #a78bfa;
+            padding: 15px 20px;
+            border-radius: 4px;
+        }
+        .info-item {
+            margin: 10px 0;
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #374151;
+            min-width: 200px;
+            margin-right: 10px;
+        }
+        .info-value {
+            color: #1f2937;
+            flex: 1;
+        }
+        .highlight-box {
+            background-color: #ede9fe;
+            border: 1px solid #a78bfa;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .highlight-box strong {
+            color: #5b21b6;
+            font-size: 16px;
+        }
+        .highlight-box p {
+            margin: 8px 0 0 0;
+            color: #6b21a8;
+        }
+        .success-box {
+            background-color: #d1fae5;
+            border: 1px solid #10b981;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .success-box strong {
+            color: #065f46;
+            font-size: 18px;
+        }
+        .success-box p {
+            margin: 8px 0 0 0;
+            color: #047857;
+        }
+        .action-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-align: center;
+            margin: 20px 0;
+            box-shadow: 0 2px 5px rgba(124, 58, 237, 0.3);
+            transition: all 0.3s ease;
+        }
+        .action-button:hover {
+            background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%);
+            box-shadow: 0 4px 8px rgba(124, 58, 237, 0.4);
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 20px 25px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .footer strong {
+            color: #7c3aed;
+            font-size: 15px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-urgent {
+            background-color: #fecaca;
+            color: #991b1b;
+        }
+        .badge-normal {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .badge-confidentiel {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .status-badge {
+            background-color: #d1fae5;
+            color: #065f46;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .content {
+                padding: 20px 15px;
+            }
+            .info-item {
+                flex-direction: column;
+            }
+            .info-label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- En-tête -->
+        <div class="header">
+            <h1>✅ Courrier de Départ Créé et Signé</h1>
+            <p>Ministère de l'Élevage, des Pêches et des Industries Animales</p>
+        </div>
+
+        <!-- Contenu principal -->
+        <div class="content">
+            <div class="greeting">
+                Bonjour,
+            </div>
+
+            <p>Un courrier de départ a été créé et signé suite au traitement du courrier que votre service gère. Cette notification confirme que la réponse est prête pour transmission.</p>
+
+            <!-- Statut de succès -->
+            <div class="success-box">
+                <strong>✅ Dossier Traité avec Succès</strong>
+                <p>Le courrier entrant a été traité et la réponse officielle est maintenant signée</p>
+            </div>
+
+            <!-- Informations du courrier de départ -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">📤</span>
+                    Courrier de Départ Créé
+                </div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">Numéro de référence :</span>
+                        <span class="info-value"><strong>{{ courrierDepart.numeroReference }}</strong></span>
+                    </div>
+                    {% if courrierDepart.numeroActe %}
+                    <div class="info-item">
+                        <span class="info-label">Numéro d'acte :</span>
+                        <span class="info-value">{{ courrierDepart.numeroActe }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <span class="info-label">Type de courrier :</span>
+                        <span class="info-value">{{ courrierDepart.typeCourrier }}</span>
+                    </div>
+                    {% if courrierDepart.classeCourrier %}
+                    <div class="info-item">
+                        <span class="info-label">Classe :</span>
+                        <span class="info-value">
+                            {% if courrierDepart.classeCourrier == 'Urgent' %}
+                                <span class="badge badge-urgent">🔴 {{ courrierDepart.classeCourrier }}</span>
+                            {% elseif courrierDepart.classeCourrier == 'Confidentiel' %}
+                                <span class="badge badge-confidentiel">🔒 {{ courrierDepart.classeCourrier }}</span>
+                            {% else %}
+                                <span class="badge badge-normal">📋 {{ courrierDepart.classeCourrier }}</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+                    {% if courrierDepart.categorie %}
+                    <div class="info-item">
+                        <span class="info-label">Catégorie :</span>
+                        <span class="info-value">{{ courrierDepart.categorie }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <span class="info-label">Date de signature :</span>
+                        <span class="info-value">{{ courrierDepart.dateSignature ? courrierDepart.dateSignature|date('d/m/Y') : 'Non renseignée' }}</span>
+                    </div>
+                    {% if courrierDepart.destinataire %}
+                    <div class="info-item">
+                        <span class="info-label">Destinataire :</span>
+                        <span class="info-value">{{ courrierDepart.destinataire.civilite }} {{ courrierDepart.destinataire.nom }}</span>
+                    </div>
+                    {% endif %}
+                    {% if courrierDepart.idSignataire %}
+                    <div class="info-item">
+                        <span class="info-label">Signataire :</span>
+                        <span class="info-value">{{ courrierDepart.idSignataire.firstname }} {{ courrierDepart.idSignataire.lastname }}</span>
+                    </div>
+                    {% endif %}
+                    {% if courrierDepart.commentaire %}
+                    <div class="info-item">
+                        <span class="info-label">Commentaire :</span>
+                        <span class="info-value"><em>{{ courrierDepart.commentaire }}</em></span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informations du courrier entrant associé -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">📥</span>
+                    Courrier Entrant Traité
+                </div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">Numéro :</span>
+                        <span class="info-value"><strong>{{ courrier.numero }}</strong></span>
+                    </div>
+                    {% if courrier.reference %}
+                    <div class="info-item">
+                        <span class="info-label">Référence :</span>
+                        <span class="info-value">{{ courrier.reference }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <span class="info-label">Objet :</span>
+                        <span class="info-value">{{ courrier.objet }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Expéditeur :</span>
+                        <span class="info-value">{{ courrier.civilite }} {{ courrier.nom }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Statut actuel :</span>
+                        <span class="info-value">
+                            <span class="status-badge">{{ courrier.statut }}</span>
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Service traitant :</span>
+                        <span class="info-value">{{ courrier.idServiceTraitant.nom }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Date d'arrivée :</span>
+                        <span class="info-value">{{ courrier.dateArrivee ? courrier.dateArrivee|date('d/m/Y') : 'Non renseignée' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Encadré information -->
+            <div class="highlight-box">
+                <strong>ℹ️ Information</strong>
+                <p>Cette réponse a été générée pour le courrier en cours de traitement dans votre service. Le courrier de départ est maintenant prêt pour transmission au destinataire via les voies administratives.</p>
+            </div>
+
+            <!-- Bouton d'action -->
+            <div style="text-align: center;">
+                <a href="https://minepia.cm/site/consultez-vos-dossiers/" class="action-button">
+                    📂 Accéder au Système
+                </a>
+            </div>
+
+            <p style="margin-top: 25px; color: #6b7280; font-size: 14px;">
+                Vous pouvez consulter les détails complets du courrier de départ et du dossier associé via le système de gestion du courrier.
+            </p>
+
+            <p style="color: #6b7280; font-size: 14px;">
+                Pour toute question ou information complémentaire, n'hésitez pas à contacter le service concerné.
+            </p>
+        </div>
+
+        <!-- Pied de page -->
+        <div class="footer">
+            <p><strong>MINEPIA</strong></p>
+            <p>Ministère de l'Élevage, des Pêches et des Industries Animales</p>
+            <p style="margin-top: 10px;">Service de Gestion du Courrier</p>
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 15px;">
+                Cet email est généré automatiquement, merci de ne pas y répondre directement.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

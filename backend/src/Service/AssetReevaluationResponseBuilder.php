@@ -11,7 +11,7 @@ final class AssetReevaluationResponseBuilder
     {
         return [
             'id' => $reevaluation->getId(),
-            // 'valeurActuelle' => $reevaluation->getValeurActuelle(),
+            'valeurActuelle' => $reevaluation->getValeurActuelle(),
             'nouvelleValeur' => $reevaluation->getNouvelleValeur(),
             'methodeEvaluation' => $reevaluation->getMethodeEvaluation(),
             'service' => $reevaluation->getService() ? [

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Login</title>
+
+        {# Bootstrap CSS #}
+		<link href="{{ asset('assets/swagger-ui/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+
+        {# Notyf CDN CSS #}
+		<link href="{{ asset('assets/notyf/css/notyf.min.css') }}" rel="stylesheet">
+    </head>
+
+    <body class="bg-light">
+        <div class="container mt-5">
+            <h2 class="text-center">Swagger Login</h2>
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    {{ form_start(form, {'attr': {'class': 'bg-white p-4 border rounded shadow-sm'}}) }}
+                        <div class="mb-3">
+                            {{ form_label(form.username) }}
+                            {{ form_widget(form.username) }}
+                            <span class="small form-text text-danger">{{ form_errors(form.username) }}</span>
+                        </div>
+                        <div class="mb-3">
+                            {{ form_label(form.plainPassword) }}
+                            {{ form_widget(form.plainPassword) }}
+                            <span class="small form-text text-danger">{{ form_errors(form.plainPassword) }}</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Login</button>
+                    {{ form_end(form) }}
+                </div>
+            </div>
+        </div>
+
+        {# Notyf CDN JS #}
+		<script src="{{ asset('assets/notyf/js/notyf.min.js') }}"></script>
+
+        {# Notyf #}
+        {{ include('layouts/partials/_notyf.html.twig') }}
+    </body>
+
+</html>

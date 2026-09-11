@@ -1,0 +1,8 @@
+gesdinet_jwt_refresh_token:
+    refresh_token_class: App\Entity\RefreshToken
+    ttl: 180  # Durée de vie du refresh token en secondes (3 minutes = fenêtre de 1 min après expiration du JWT)
+    ttl_update: true  # Met à jour le TTL du refresh token à chaque utilisation
+    firewall: login  # Firewall utilisé pour l'authentification
+    user_provider: app_user_provider  # Provider d'utilisateurs
+    user_identity_field: username  # Champ utilisé pour identifier l'utilisateur
+    single_use: false  # Permet la réutilisation du même refresh token

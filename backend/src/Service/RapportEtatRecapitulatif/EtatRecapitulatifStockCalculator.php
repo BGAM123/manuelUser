@@ -24,80 +24,37 @@ final class EtatRecapitulatifStockCalculator
      * 📍 BLOC 1 : calculateStockForConsumableAtDate()
      * ================================================================
      * 
-     * 🎯 RÔLE : Calcule le stock à une date donnée
+     * 🎯 RÔLE : Calcule le stock PENDANT une période (comme entrees/sorties)
      * 
-     * 📊 UTILISÉ POUR :
-     * - stockAuEntre (stock avant période) → appel avec position = 'before'
-     * - stockAuSortie (stock après période) → appel avec position = 'after'
-     * 
-     * ⚠️ ACTUELLEMENT, cette méthode est utilisée pour stockAuEntre UNIQUEMENT
-     * (car stockAuSortie est calculé avec la formule stockAuEntre + entrees - sorties)
-     * 
-     * 📍 EMPLACEMENT DANS analyzeConsumable() :
-     * $stockAuEntre = $this->stockCalculator->calculateStockForConsumableAtDate(
-     *     $consumableId, $serviceIds, $periodeDebut, 'before'
-     * );
+     * � UTILISÉ POUR :
+     * - stockAuEntre (stock pendant période)
      * 
      * 🔍 LOGIQUE DE LA MÉTHODE :
-     * 1. Récupère les INITIAL avant/à la date → $totalInitial
-     * 2. Récupère les ENTRIES (consumable_entry) avant/à la date → $totalEntries
-     * 3. Récupère les TRANSFERT reçus avant/à la date → $totalEntrees
-     * 4. Récupère les BSP avant/à la date → $totalBsp
-     * 5. Récupère les TRANSFERT envoyés avant/à la date → $totalSorties
+     * 1. Récupère les ENTRIES pendant la période → $totalEntries
+     * 2. Récupère les TRANSFERT reçus pendant la période → $totalEntrees
      * 
-     * ⚠️ PROBLÈME IDENTIFIÉ ICI :
-     * Ligne ~55 : $quantite = max(0, $totalBsp + $totalSorties);
-     * -> Ceci retourne UNIQUEMENT les sorties, pas le stock total !
-     * -> Devrait être : $totalInitial + $totalEntries + $totalEntrees - $totalBsp - $totalSorties
+     * FORMULE : Stock = ENTRIES + TRANSFERT_REÇUS
      */
     public function calculateStockForConsumableAtDate(
         int $consumableId,
         ?array $serviceIds = null,
-        \DateTimeInterface $date,
-        string $position = 'before'
+        \DateTimeInterface $periodeDebut,
+        \DateTimeInterface $periodeFin
     ): array {
         $conn = $this->connection;
         $consumableIdEscaped = (int) $consumableId;
-        $dateStr = $date->format('Y-m-d');
-        
-        $operator = $position === 'before' ? '<' : '<=';
-        
-        // ----------------------------------------------------------------
-        // 📍 SOUS-BLOC 1.1 : Récupération des INITIAL
-        // ----------------------------------------------------------------
-        // 🎯 RÔLE : Récupère les stocks initiaux (type = 'INITIAL')
-        // 📊 SOURCE : Table consumable_transfer
-        // ➕ IMPACT : + quantite (entrée)
-        // 🔗 FILTRE : type = 'INITIAL', statut = 'INITIAL'
-        // 📌 UTILISÉ POUR : stockAuEntre (avant période)
-        $sqlInitial = "SELECT COALESCE(SUM(ct.quantite), 0)
-                       FROM consumable_transfer ct
-                       WHERE ct.consumable_id = {$consumableIdEscaped}
-                       AND ct.is_delete = 0
-                       AND ct.type = 'INITIAL'
-                    --    AND ct.statut = 'INITIAL'
-                       AND ct.date_transfert {$operator} '{$dateStr}'";
-        
-        if ($serviceIds !== null) {
-            $serviceIdsEscaped = array_map('intval', $serviceIds);
-            $serviceIdsIn = implode(',', $serviceIdsEscaped);
-            $sqlInitial .= " AND ct.service_destination_id IN ({$serviceIdsIn})";
-        }
-        
-        $totalInitial = (float) $conn->executeQuery($sqlInitial)->fetchOne();
+        $debutStr = $periodeDebut->format('Y-m-d');
+        $finStr = $periodeFin->format('Y-m-d');
         
         // ----------------------------------------------------------------
-        // 📍 SOUS-BLOC 1.2 : Récupération des ENTRIES (consumable_entry)
+        // 📍 SOUS-BLOC 1.1 : Récupération des ENTRIES pendant période
         // ----------------------------------------------------------------
-        // 🎯 RÔLE : Récupère les entrées depuis la table consumable_entry
-        // 📊 SOURCE : Table consumable_entry
-        // ➕ IMPACT : + quantite (entrée)
-        // 📌 UTILISÉ POUR : stockAuEntre (avant période)
         $sqlEntries = "SELECT COALESCE(SUM(ce.quantite), 0)
                        FROM consumable_entry ce
                        WHERE ce.consumable_id = {$consumableIdEscaped}
                        AND ce.is_delete = 0
-                       AND ce.date_entree {$operator} '{$dateStr}'";
+                       AND ce.date_entree >= '{$debutStr}'
+                       AND ce.date_entree <= '{$finStr}'";
         
         if ($serviceIds !== null) {
             $serviceIdsEscaped = array_map('intval', $serviceIds);
@@ -108,45 +65,32 @@ final class EtatRecapitulatifStockCalculator
         $totalEntries = (float) $conn->executeQuery($sqlEntries)->fetchOne();
         
         // ----------------------------------------------------------------
-        // 📍 SOUS-BLOC 1.3 : Récupération des TRANSFERT reçus
+        // 📍 SOUS-BLOC 1.2 : Récupération des TRANSFERT reçus pendant période
         // ----------------------------------------------------------------
-        // 🎯 RÔLE : Récupère les transferts reçus (entrées)
-        // 📊 SOURCE : Table consumable_transfer
-        // ➕ IMPACT : + quantite (entrée)
-        // 🔗 FILTRE : type = 'TRANSFERT_DIRECT', statut = 'TRANSFERE'
-        // 📌 UTILISÉ POUR : stockAuEntre (avant période)
         $sqlEntrees = "SELECT COALESCE(SUM(ct.quantite), 0)
                        FROM consumable_transfer ct
                        WHERE ct.consumable_id = {$consumableIdEscaped}
                        AND ct.is_delete = 0
                        AND ct.type = 'TRANSFERT_DIRECT'
                     --    AND ct.statut = 'TRANSFERE'
-                       AND ct.date_transfert {$operator} '{$dateStr}'";
+                       AND ct.date_transfert >= '{$debutStr}'
+                       AND ct.date_transfert <= '{$finStr}'";
         
         if ($serviceIds !== null) {
             $serviceIdsEscaped = array_map('intval', $serviceIds);
             $serviceIdsIn = implode(',', $serviceIdsEscaped);
             $sqlEntrees .= " AND ct.service_destination_id IN ({$serviceIdsIn})";
         }
-        
-        $totalEntrees = (float) $conn->executeQuery($sqlEntrees)->fetchOne();
-        
-        // ----------------------------------------------------------------
-        // 📍 SOUS-BLOC 1.4 : Récupération des BSP
-        // ----------------------------------------------------------------
-        // 🎯 RÔLE : Récupère les bonnes de sortie (consommations)
-        // 📊 SOURCE : Table consumable_transfer
-        // ➖ IMPACT : - quantite (sortie)
-        // 🔗 FILTRE : type = 'BSP'
-        // ⚠️ STATUT 'SORTI' est COMMENTÉ ! (ligne 75)
-        // 📌 UTILISÉ POUR : stockAuEntre (avant période)
+
+
         $sqlBsp = "SELECT COALESCE(SUM(ct.quantite), 0)
                    FROM consumable_transfer ct
                    WHERE ct.consumable_id = {$consumableIdEscaped}
                    AND ct.is_delete = 0
                    AND ct.type = 'BSP'
-                --    AND ct.statut = 'SORTI'  // ⚠️ COMMENTÉ ! Cela inclut TOUS les BSP
-                   AND ct.date_transfert {$operator} '{$dateStr}'";
+                --    AND ct.statut = 'SORTI'  // ⚠️ COMMENTÉ !
+                   AND ct.date_transfert >= '{$debutStr}'
+                   AND ct.date_transfert <= '{$finStr}'";
         
         if ($serviceIds !== null) {
             $serviceIdsEscaped = array_map('intval', $serviceIds);
@@ -156,46 +100,13 @@ final class EtatRecapitulatifStockCalculator
         
         $totalBsp = (float) $conn->executeQuery($sqlBsp)->fetchOne();
         
-        // ----------------------------------------------------------------
-        // 📍 SOUS-BLOC 1.5 : Récupération des TRANSFERT envoyés
-        // ----------------------------------------------------------------
-        // 🎯 RÔLE : Récupère les transferts envoyés (sorties)
-        // 📊 SOURCE : Table consumable_transfer
-        // ➖ IMPACT : - quantite (sortie)
-        // 🔗 FILTRE : type = 'TRANSFERT_DIRECT', statut = 'TRANSFERE'
-        // ⚠️ service_source_id IS NOT NULL est COMMENTÉ ! (ligne 84)
-        // ⚠️ Filtre par service_source_id est COMMENTÉ ! (lignes 87-89)
-        // 📌 UTILISÉ POUR : stockAuEntre (avant période)
-        $sqlSorties = "SELECT COALESCE(SUM(ct.quantite), 0)
-                       FROM consumable_transfer ct
-                       WHERE ct.consumable_id = {$consumableIdEscaped}
-                       AND ct.is_delete = 0
-                       AND ct.type = 'TRANSFERT_DIRECT'
-                    --    AND ct.statut = 'TRANSFERE'
-                    --    AND ct.service_source_id IS NOT NULL  // ⚠️ COMMENTÉ !
-                       AND ct.date_transfert {$operator} '{$dateStr}'";
-        
-        // if ($serviceId !== null) {  // ⚠️ COMMENTÉ !
-        //     $serviceIdEscaped = (int) $serviceId;
-        //     $sqlSorties .= " AND ct.service_source_id = {$serviceIdEscaped}";
-        // }
-        
-        $totalSorties = (float) $conn->executeQuery($sqlSorties)->fetchOne();
+        $totalEntrees = (float) $conn->executeQuery($sqlEntrees)->fetchOne();
         
         // ----------------------------------------------------------------
-        // 📍 SOUS-BLOC 1.6 : CALCUL FINAL DU STOCK
+        // 📍 SOUS-BLOC 1.3 : CALCUL FINAL DU STOCK
         // ----------------------------------------------------------------
-        // ⚠️⚠️⚠️ PROBLÈME MAJEUR ICI ⚠️⚠️⚠️
-        // Actuellement : $quantite = max(0, $totalBsp + $totalSorties);
-        // -> Ceci retourne UNIQUEMENT les sorties !
-        // 
-        // ✅ Devrait être :
-        // $quantite = max(0, $totalInitial + $totalEntries + $totalEntrees - $totalBsp - $totalSorties);
-        // 
-        // FORMULE : Stock = INITIAL + ENTRIES + TRANSFERT_REÇUS - BSP - TRANSFERT_ENVOYÉS
-        // 
-        // 📌 C'EST ICI QUE stockAuEntre (0) est calculé !
-        $quantite = max(0, $totalInitial + $totalEntries + $totalEntrees - $totalBsp - $totalSorties);
+        // FORMULE : Stock = ENTRIES + TRANSFERT_REÇUS
+        $quantite = $totalEntrees + $totalBsp;
         
         return ['quantite' => $quantite, 'valeur' => null];
     }
@@ -306,7 +217,26 @@ final class EtatRecapitulatifStockCalculator
             $sqlEntrees .= " AND ct.service_destination_id IN ({$serviceIdsIn})";
         }
         
+        
         $totalEntrees = (float) $conn->executeQuery($sqlEntrees)->fetchOne();
+
+
+        $sqlBsp = "SELECT COALESCE(SUM(ct.quantite), 0)
+                   FROM consumable_transfer ct
+                   WHERE ct.consumable_id = {$consumableIdEscaped}
+                   AND ct.is_delete = 0
+                   AND ct.type = 'BSP'
+                --    AND ct.statut = 'SORTI'  // ⚠️ COMMENTÉ !
+                   AND ct.date_transfert >= '{$debutStr}'
+                   AND ct.date_transfert <= '{$finStr}'";
+        
+        if ($serviceIds !== null) {
+            $serviceIdsEscaped = array_map('intval', $serviceIds);
+            $serviceIdsIn = implode(',', $serviceIdsEscaped);
+            $sqlBsp .= " AND ct.service_destination_id IN ({$serviceIdsIn})";
+        }
+        
+        $totalBsp = (float) $conn->executeQuery($sqlBsp)->fetchOne();
         
         // ----------------------------------------------------------------
         // 📍 SOUS-BLOC 2.4 : CALCUL FINAL DES ENTREES
@@ -322,10 +252,52 @@ final class EtatRecapitulatifStockCalculator
         // 
         // 📌 C'EST ICI QUE entrees (5156) est calculé !
         return [
-            // 'quantite' => $totalEntries - $totalEntrees,
-            'quantite' => $totalEntries - $totalEntrees,
+            'quantite' => $totalEntries - $totalBsp,
+            // 'quantite' => $totalEntrees,
             'valeur' => null
         ];
+
+
+
+        // 2. ENTRIES (consumable_entry) pendant période → + quantite
+    $sqlEntries = "SELECT COALESCE(SUM(ce.quantite), 0)
+                   FROM consumable_entry ce
+                   WHERE ce.consumable_id = {$consumableIdEscaped}
+                   AND ce.is_delete = 0
+                   AND ce.date_entree >= '{$debutStr}'
+                   AND ce.date_entree <= '{$finStr}'";
+    
+    if ($serviceIds !== null && !empty($serviceIds)) {
+        $serviceIdsEscaped = array_map('intval', $serviceIds);
+        $serviceIdsIn = implode(',', $serviceIdsEscaped);
+        $sqlEntries .= " AND ce.service_id IN ({$serviceIdsIn})";
+    }
+    
+    $totalEntries = (float) $conn->executeQuery($sqlEntries)->fetchOne();
+
+    // 3. TRANSFERT reçus pendant période → + quantite
+    $sqlEntrees = "SELECT COALESCE(SUM(ct.quantite), 0)
+                   FROM consumable_transfer ct
+                   WHERE ct.consumable_id = {$consumableIdEscaped}
+                   AND ct.is_delete = 0
+                   AND ct.type = 'TRANSFERT_DIRECT'
+                   AND ct.statut = 'TRANSFERE'
+                   AND ct.date_transfert >= '{$debutStr}'
+                   AND ct.date_transfert <= '{$finStr}'";
+    
+    if ($serviceIds !== null && !empty($serviceIds)) {
+        $serviceIdsEscaped = array_map('intval', $serviceIds);
+        $serviceIdsIn = implode(',', $serviceIdsEscaped);
+        $sqlEntrees .= " AND ct.service_destination_id IN ({$serviceIdsIn})";
+    }
+    
+    $totalEntrees = (float) $conn->executeQuery($sqlEntrees)->fetchOne();
+
+    // ✅ Entrées = INITIAL + ENTRIES + TRANSFERT_REÇUS
+    return [
+        'quantite' => $totalInitial + $totalEntries + $totalEntrees,
+        'valeur' => null
+    ];
     }
 
     /**
@@ -424,6 +396,7 @@ final class EtatRecapitulatifStockCalculator
         // 
         // 📌 C'EST ICI QUE sorties (156) est calculé !
         return [
+            // 'quantite' =>  $totalTransfer,
             'quantite' => $totalBsp + $totalTransfer,
             'valeur' => null
         ];

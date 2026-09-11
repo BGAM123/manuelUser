@@ -106,6 +106,10 @@ final class AssetReevaluationService
                 $asset = $this->assetRepository->find($assetId);
                 if ($asset) {
                     $reevaluation->addAsset($asset);
+                    // ✅ Récupérer la valeur actuelle du bien si elle n'est pas déjà définie
+                    if (!isset($payload['valeurActuelle']) && $asset->getValeur() !== null) {
+                        $reevaluation->setValeurActuelle($asset->getValeur());
+                    }
                 }
             }
         }
@@ -115,6 +119,11 @@ final class AssetReevaluationService
             if ($service) {
                 $reevaluation->setService($service);
             }
+        }
+
+         // ✅ Permettre de surcharger manuellement la valeur actuelle
+        if (isset($payload['valeurActuelle'])) {
+            $reevaluation->setValeurActuelle($payload['valeurActuelle']);
         }
 
         if (isset($payload['valeurActuelle'])) {

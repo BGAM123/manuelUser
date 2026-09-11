@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nouveau courrier à traiter - MINEPIA</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header-logo {
+            margin-bottom: 15px;
+        }
+        .header-logo img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            padding: 5px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 16px;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        .alert-box {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .alert-box p {
+            margin: 0;
+            color: #92400e;
+            font-weight: 600;
+        }
+        .info-box {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+        .info-box h2 {
+            color: #1e3a8a;
+            font-size: 18px;
+            margin: 0 0 15px 0;
+            text-align: center;
+        }
+        .info-item {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #dbeafe;
+        }
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #1e3a8a;
+            min-width: 150px;
+        }
+        .info-value {
+            color: #374151;
+            flex: 1;
+        }
+        .priority-high {
+            background-color: #fee2e2;
+            color: #991b1b;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .priority-normal {
+            background-color: #dbeafe;
+            color: #1e40af;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .message {
+            font-size: 15px;
+            color: #4b5563;
+            line-height: 1.6;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .link-box {
+            background-color: #f0f9ff;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .link-box p {
+            margin: 0 0 10px 0;
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+        .link-box a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .link-box a:hover {
+            text-decoration: underline;
+        }
+        .footer {
+            background-color: #f8fafc;
+            padding: 25px 30px;
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer strong {
+            color: #1e3a8a;
+            display: block;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-logo">
+                <img src="https://cdeno.org/wp-content/uploads/2023/11/LOGO-MINEPIA-1024x1024.jpg" alt="Logo MINEPIA">
+            </div>
+            <h1>📨 Nouveau Courrier à Traiter</h1>
+            <p>Ministère de l'Élevage, des Pêches et des Industries Animales</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Bonjour,
+            </div>
+            
+            <div class="alert-box">
+                <p>⚠️ Un nouveau courrier vous a été transmis pour traitement</p>
+            </div>
+            
+            <div class="info-box">
+                <h2>📋 Informations du courrier</h2>
+                <div class="info-item">
+                    <span class="info-label">Numéro :</span>
+                    <span class="info-value">{{ courrier.numero }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Référence :</span>
+                    <span class="info-value">{{ courrier.reference }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Objet :</span>
+                    <span class="info-value">{{ courrier.objet }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Expéditeur :</span>
+                    <span class="info-value">{{ courrier.civilite }} {{ courrier.nom }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Priorité :</span>
+                    <span class="info-value">
+                        <span class="priority-{{ courrier.priorite|lower == 'haute' ? 'high' : 'normal' }}">
+                            {{ courrier.priorite }}
+                        </span>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Date d'arrivée :</span>
+                    <span class="info-value">{{ courrier.dateArrivee ? courrier.dateArrivee|date('d/m/Y') : 'N/A' }}</span>
+                </div>
+                {% if courrier.commentaire %}
+                <div class="info-item">
+                    <span class="info-label">Commentaire :</span>
+                    <span class="info-value">{{ courrier.commentaire }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <p class="message">
+                ⏰ <strong>Veuillez traiter ce courrier dans les meilleurs délais.</strong><br>
+                Vous pouvez accéder au système de gestion pour consulter le détail du courrier.
+            </p>
+            
+            <div class="link-box">
+                <p>🔗 Accédez au système de gestion :</p>
+                <a href="https://minepia.cm/site/consultez-vos-dossiers/" target="_blank">
+                    https://minepia.cm/site/consultez-vos-dossiers/
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Cordialement,
+            <strong>MINEPIA - Ministère de l'Élevage, des Pêches et des Industries Animales</strong>
+        </div>
+    </div>
+</body>
+</html>

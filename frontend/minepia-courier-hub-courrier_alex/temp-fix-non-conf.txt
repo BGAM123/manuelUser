@@ -1,0 +1,84 @@
+      
+      // Si une catégorie est définie, charger les correspondants de cette catégorie
+      if (courrier.categorieProvenance) {
+        console.log("Chargement des correspondants pour la catégorie:", courrier.categorieProvenance);
+        await fetchCorrespondants(courrier.categorieProvenance);
+      } else {
+        // Charger tous les correspondants si pas de catégorie
+        await fetchCorrespondants();
+      }
+      
+      // Récupérer le fichier principal (document)
+      if (courrier.document) {
+        setExistingFileUrl(`${API_URL}${courrier.document}`);
+        setExistingFileName(courrier.document.split('/').pop() || 'Document principal');
+        console.log("Document principal trouvé:", courrier.document);
+      }
+      
+      // Récupérer les pièces jointes existantes
+      if (courrier.piecesJointes && courrier.piecesJointes.length > 0) {
+        setExistingAttachments(courrier.piecesJointes);
+        console.log("Pièces jointes trouvées:", courrier.piecesJointes.length);
+      }
+      
+      // Pré-remplir le formulaire avec les données du courrier
+      // Normaliser la priorité du backend vers le frontend
+      let prioriteFrontend = courrier.priorite || "Normal";
+      if (courrier.priorite === "Moyenne" || courrier.priorite === "moyenne") {
+        prioriteFrontend = "Normal";
+      } else if (courrier.priorite === "Haute" || courrier.priorite === "haute") {
+        prioriteFrontend = "Haute";
+      } else if (courrier.priorite === "Basse" || courrier.priorite === "basse") {
+        prioriteFrontend = "Basse";
+      }
+      
+      console.log("Mapping des données du courrier:");
+      console.log("  - civilite:", courrier.civilite);
+      console.log("  - nom:", courrier.nom);
+      console.log("  - typeTransfert:", courrier.typeTransfert);
+      console.log("  - categorieProvenance:", courrier.categorieProvenance);
+      console.log("  - idProvenance:", courrier.idProvenance);
+      console.log("  - typeCourrier:", courrier.typeCourrier);
+      console.log("  - Structure ID:", courrier.idServiceTraitant?.id);
+      
+      // Trouver les IDs correspondants aux valeurs string
+      // 1. Trouver l'ID de la catégorie à partir du nom
+      const categoryId = categories.find(cat => cat.nom === courrier.categorieProvenance)?.id?.toString() || "";
+      console.log("  - Category ID trouvé:", categoryId, "pour", courrier.categorieProvenance);
+      
+      // 2. L'ID de provenance est déjà disponible
+      const provenanceId = courrier.idProvenance?.id?.toString() || "";
+      console.log("  - Provenance ID:", provenanceId);
+      
+      // 3. Trouver l'ID du type de courrier à partir du nom
+      const typeCourrierId = TypesCourrier.find(tc => tc.nom === courrier.typeCourrier)?.id?.toString() || "";
+      console.log("  - Type courrier ID trouvé:", typeCourrierId, "pour", courrier.typeCourrier);
+      
+      // Utiliser setTimeout pour s'assurer que les états sont à jour
+      setTimeout(() => {
+        reset({
+          civilite: courrier.civilite || undefined,
+          reference: courrier.reference || "",
+          objet: courrier.objet || "",
+          priority: prioriteFrontend as "Haute" | "Normal" | "Basse",
+          arrivalDate: courrier.dateArrivee ? new Date(courrier.dateArrivee) : new Date(),
+          registrationDate: courrier.dateEnregistrement ? new Date(courrier.dateEnregistrement) : new Date(),
+          phone: courrier.telephone || "",
+          email: courrier.email || "",
+          address: courrier.adresse || "",
+          comment: courrier.commentaire || "",
+          category: categoryId,
+          provenance: provenanceId,
+          structure: courrier.idServiceTraitant?.id?.toString() || "",
+          transmissionType: courrier.typeTransfert || courrier.transmissions?.[0]?.typeTransfert || "",
+          typecourrier: typeCourrierId,
+          sousTypeCourrier: courrier.sousTypeCourrier || "",
+          notifyByEmail: false,
+          notifyBySms: false,
+        });
+        
+        console.log("Formulaire prérempli avec succès");
+        console.log("  - Category setValue:", categoryId);
+        console.log("  - Provenance setValue:", provenanceId);
+        console.log("  - Type courrier setValue:", typeCourrierId);
+      }, 100);

@@ -1,6 +1,11 @@
 twig:
     file_name_pattern: '*.twig'
 
+    globals:
+        app_support_mail: '%app_support_mail%'
+        app_noreply_mail: '%app_noreply_mail%'
+        app_front_url_contact: '%app_front_url_contact%'
+
 when@test:
     twig:
         strict_variables: true

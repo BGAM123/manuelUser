@@ -1,21 +1,21 @@
-# yaml-language-server: $schema=../vendor/symfony/routing/Loader/schema/routing.schema.json
-
-# This file is the entry point to configure the routes of your app.
-# Methods with the #[Route] attribute are automatically imported.
-# See also https://symfony.com/doc/current/routing.html
-
-# To list all registered routes, run the following command:
-#   bin/console debug:router
-
-# Redirect root to API documentation
-app_root:
-    path: /
-    methods: ['GET']
-    defaults: { _controller: 'Symfony\Bundle\FrameworkBundle\Controller\RedirectController', route: 'app.swagger_ui', permanent: false }
-
 controllers:
-    resource: routing.controllers
+    resource:
+        path: ../src/Controller/
+        namespace: App\Controller
+    type: attribute
 
-# API REST Login path
-api_login_check:
-    path: /login_check
+# Routes pour l'authetification
+app_login:
+    path: /login
+
+# Routes pour Swagger UI
+app_swagger:
+    path: /
+    controller: App\Controller\Swagger\SwaggerController::index
+
+# Routes pour Swagger UI du module Core|Profile|Reset
+app_swagger_module:
+    path: /{module}
+    controller: App\Controller\Swagger\SwaggerController::module
+    requirements:
+        module: core|acct|projet|dcao|rh|com|forms|profile|reset|security

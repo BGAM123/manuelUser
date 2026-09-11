@@ -1,0 +1,17 @@
+[33m3696ae89[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32malextest[m[33m)[m HEAD@{0}: merge origin/ManuBranchTest: Merge made by the 'ort' strategy.
+[33m4382bde6[m[33m ([m[1;31morigin/alextest[m[33m)[m HEAD@{1}: commit: relance bouton
+[33m13a02c60[m HEAD@{2}: commit: mises a jur le 26
+[33m65d8953f[m HEAD@{3}: merge origin/ManuBranchTest: Merge made by the 'ort' strategy.
+[33md3c7bf1c[m HEAD@{4}: commit: statistiques
+[33m9ef4f031[m HEAD@{5}: commit: relance
+[33mc3e67ce0[m HEAD@{6}: merge origin/ManuBranchTest: Merge made by the 'ort' strategy.
+[33m927cde88[m HEAD@{7}: commit: traduction
+[33mde3786ec[m HEAD@{8}: commit: relance
+[33mac2aa0cf[m HEAD@{9}: merge origin/ManuBranchTest: Fast-forward
+[33m76aa22ee[m HEAD@{10}: merge origin/ManuBranchTest: Merge made by the 'ort' strategy.
+[33ma5f62da3[m HEAD@{11}: commit: traduction 2
+[33m92cf0fd4[m HEAD@{12}: commit: ECMD 42
+[33m9edb8446[m HEAD@{13}: commit: ECMD 42
+[33m5032ccac[m HEAD@{14}: commit: traduction
+[33md4998be2[m HEAD@{15}: merge origin/ManuBranchTest: Fast-forward
+[33mf6a27b53[m HEAD@{16}: clone: from https://github.com/kiamaDRDE/minepia-courier-hub.git

@@ -1,0 +1,16 @@
+{% extends 'layouts/base_swagger-ui.html.twig' %}
+
+{% block title %}
+	Reset API Documentation
+{% endblock %}
+
+{% block body %}
+    <script>
+        window.onload = function() {
+            SwaggerUIBundle({
+                url: "/swagger/Reset.json",
+                dom_id: '#swagger-ui',
+            });
+        };
+    </script>
+{% endblock %}

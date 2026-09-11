@@ -1,0 +1,18 @@
+
+nelmio_cors:
+    defaults:
+        origin_regex: true
+        allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']  # Utilisation d'une variable d'environnement
+        allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+        allow_headers: ['Content-Type', 'Authorization']
+        expose_headers: ['Link']
+        max_age: 3600
+        allow_credentials: true
+
+    paths:
+        '^/':  # Applique ces règles à toutes les routes
+            allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']  # Ajouté ici aussi pour être appliqué aux routes
+            allow_methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE']
+            allow_headers: ['Content-Type', 'Authorization']
+            max_age: 3600
+            allow_credentials: true  # ✅ Ajouté aussi ici pour être sûr

@@ -1,12 +1,57 @@
-# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
-
 # This file is the entry point to configure your own services.
 # Files in the packages/ subdirectory configure your dependencies.
-# See also https://symfony.com/doc/current/service_container/import.html
 
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    app_name: 'MINEPIA'
+    app_noreply_mail: 'minepia.courrier@gmail.com'
+    app_support_mail: 'minepia.courrier@gmail.com'
+    app.mailer_sender: 'minepia.courrier@gmail.com'
+    app_uploads_core_avatars_directory: '%kernel.project_dir%/public/uploads/core/avatars'
+    app_uploads_core_justificatif_directory: '%kernel.project_dir%/public/uploads/core/tiers/justification'
+    app_uploads_acct_engagement_directory: '%kernel.project_dir%/public/uploads/acct/engagement'
+    app_uploads_projet_core_directory: '%kernel.project_dir%/public/uploads/projet/core'
+    app_uploads_projet_tache_directory: '%kernel.project_dir%/public/uploads/projet/tache'
+    app_uploads_projet_document_type_directory: '%kernel.project_dir%/public/uploads/projet/document_type'
+    app_uploads_acct_paiement_directory: '%kernel.project_dir%/public/uploads/acct/paiement'
+    app_uploads_acct_justificatif_directory: '%kernel.project_dir%/public/uploads/acct/justificatif'
+    app_uploads_rh_permission_directory: '%kernel.project_dir%/public/uploads/rh/permission'
+    app_uploads_rh_sanction_directory: '%kernel.project_dir%/public/uploads/rh/sanction'
+    app_uploads_rh_core_directory: '%kernel.project_dir%/public/uploads/rh/core'
+    app_uploads_com_core_directory: '%kernel.project_dir%/public/uploads/com/core'
+    app_uploads_forms_core_directory: '%kernel.project_dir%/public/uploads/forms/core'
+    app_uploads_courrier_directory: '%kernel.project_dir%/public/uploads/courrier/document/'
+    app_uploads_courrier_piece_directory: '%kernel.project_dir%/public/uploads/courrier/pieces/'
+    app_uploads_courrier_piece: '/uploads/courrier/pieces/'
+    app_uploads_courrier: '/uploads/courrier/document/'
+    app_uploads_courrier_public_path: '/uploads/courrier/document/'
+    app_uploads_core_avatars: '/uploads/core/avatars/'
+    app_uploads_core_justificatif: '/uploads/core/tiers/justification/'
+    app_uploads_acct_engagement: '/uploads/acct/engagement/'
+    app_uploads_acct_paiement: '/uploads/acct/paiement/'
+    app_uploads_acct_justificatif: '/uploads/acct/justificatif/'
+    app_uploads_projet_core: '/uploads/projet/core/'
+    app_uploads_projet_tache: '/uploads/projet/tache/'
+    app_uploads_projet_document_type: '/uploads/projet/document_type/'
+    app_uploads_rh_permission: '/uploads/rh/permission/'
+    app_uploads_rh_sanction: '/uploads/rh/sanction/'
+    app_uploads_rh_core: '/uploads/rh/core/'
+    app_uploads_com_core: '/uploads/com/core/'
+    app_uploads_forms_core: '/uploads/forms/core/'
+    app_front_url: '%env(APP_FRONT_URL)%'
+    app_front_url_contact: '%env(APP_FRONT_URL_CONTACT)%'
+    
+    # Parametres SMS
+    SMS_API_URL: '%env(SMS_API_URL)%'
+    SMS_API_KEY: '%env(SMS_API_KEY)%'
+    SMS_SENDER: '%env(SMS_SENDER)%'
+
+    # Courrier Depart
+    app_uploads_courrier_depart_directory: '%kernel.project_dir%/public/uploads/courrier_depart/document'
+    app_uploads_courrier_depart: '/uploads/courrier_depart/document/'
+    app_uploads_courrier_depart_piece_directory: '%kernel.project_dir%/public/uploads/courrier_depart/pieces'
+    app_uploads_courrier_depart_piece: '/uploads/courrier_depart/pieces/'
 
 services:
     # default configuration for services in *this* file
@@ -14,28 +59,76 @@ services:
         autowire: true      # Automatically injects dependencies in your services.
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
 
+    # configuration for logs
+    App\Logger\DoctrineLogHandler:
+        arguments:
+            $tokenStorage: '@security.token_storage'
+            $authChecker: '@security.authorization_checker'
+
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+            - '../src/Controller/StatisticsController.php' # Ajoutez cette ligne
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
-    App\Service\OtpService:
-        arguments:
-            $mailFromAddress: '%env(MAIL_FROM_ADDRESS)%'
-            $mailFromName: '%env(MAIL_FROM_NAME)%'
-
-    App\Service\FileUploadService:
-        arguments:
-            $projectDir: '%kernel.project_dir%'
-
-    App\EventListener\DoctrineTypeRegistrar:
+    # Gere le succes de l'authentification via JWT
+    App\Security\JWTAuthenticationSuccessHandler:
         tags:
-            - { name: kernel.event_listener, event: kernel.request, priority: 255 }
+            - { name: 'kernel.event_listener', event: lexik_jwt_authentication.on_authentication_success, method: onAuthenticationSuccess }
 
-    App\EventListener\BlameableListener:
+    # Ecouteur d'evenements : Gere la creation d'un JWT
+    App\EventListener\JWTCreatedListener:
         tags:
-            - { name: doctrine.event_listener, event: prePersist }
-            - { name: doctrine.event_listener, event: preUpdate }
+            - { name: kernel.event_listener, event: lexik_jwt_authentication.on_jwt_created, method: onJWTCreated }
+
+    # Ecouteur d'evenements : Enrichit la réponse d'authentification avec le refresh token
+    App\EventListener\AuthenticationSuccessListener:
+        tags:
+            - { name: kernel.event_listener, event: lexik_jwt_authentication.on_authentication_success, method: onAuthenticationSuccessResponse }
+
+    # Subscriber d'evenements : Gere les exceptions personnalisees
+    App\EventSubscriber\CustomExceptionSubscriber:
+        tags:
+            - { name: kernel.event_subscriber }
+
+    # Subscriber d'evenements : Gere les exceptions systeme
+    App\EventSubscriber\SystemExceptionSubscriber:
+        tags:
+            - { name: kernel.event_subscriber }
+
+    # Service de gestion des emails
+    App\Service\MailService: ~
+
+    # Services SMS
+    App\Service\SmsService: ~
+    
+    App\Service\AsyncSmsService:
+        arguments:
+            $messageBus: '@messenger.default_bus'
+
+
+    # Service pour logger les actions utilisateurs
+    App\Service\UserActionLoggerService:
+        arguments:
+            $logger: '@monolog.logger.user_action'
+            $tokenStorage: '@security.token_storage'
+            $messageBus: '@messenger.default_bus'
+            $asyncLogging: true # true = asynchrone, false = synchrone
+
+    # Handler pour traiter les messages de log asynchrones
+    App\MessageHandler\UserActionLogMessageHandler:
+        arguments:
+            $userActionLogger: '@monolog.logger.user_action'
+        tags:
+            - { name: 'messenger.message_handler' }
+
+
+
+

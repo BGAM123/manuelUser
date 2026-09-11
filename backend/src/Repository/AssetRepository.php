@@ -233,16 +233,37 @@ class AssetRepository extends ServiceEntityRepository
             ->leftJoin('a.createdBy', 'creator')
             ->leftJoin('a.assetSecurities', 'assetSec')
             ->leftJoin('assetSec.security', 'sec')
+            ->leftJoin('a.champs', 'champ') // ✅ JOIN pour les champs personnalisés
+            ->leftJoin('champ.inputs', 'input') // ✅ JOIN pour les valeurs des champs
+            ->leftJoin('a.etatBiens', 'e') // ✅ JOIN pour l'état du bien
+            ->leftJoin('a.services', 's')  // ✅ JOIN pour le service (structure)
             ->andWhere('a.isDelete = :isDelete')
             ->setParameter('isDelete', $isDelete)
             ->orderBy('a.id', 'DESC')
             ->setFirstResult(($page - 1) * $limit)
             ->setMaxResults($limit);
 
+        // 🔍 RECHERCHE AVANCÉE : cherche dans TOUS les champs
         if (null !== $search && '' !== $search) {
-            $qb->andWhere('a.nom LIKE :search OR a.reference LIKE :search OR a.numeroSerie LIKE :search')
-                ->setParameter('search', '%' . $search . '%');
+            $searchTerm = '%' . $search . '%';
+            $qb->andWhere(
+                $qb->expr()->orX(
+                    'a.nom LIKE :search',
+                    'a.reference LIKE :search',
+                    'a.numeroSerie LIKE :search',
+                    'a.description LIKE :search',
+                    'a.code LIKE :search',
+                    'c.nom LIKE :search',          // ✅ Catégorie
+                    't.nom LIKE :search',           // ✅ Type de bien
+                    'e.nom LIKE :search',           // ✅ État du bien
+                    's.nom LIKE :search',           // ✅ Structure (service)
+                    'assService.nom LIKE :search',  // ✅ Service via affectation
+                    'champ.nom LIKE :search',       // ✅ NOM du champ personnalisé
+                    'input.valeur LIKE :search'     // ✅ VALEUR du champ personnalisé
+                )
+            )->setParameter('search', $searchTerm);
         }
+
         if (null !== $categoryId) {
             $qb->andWhere('c.id = :categoryId')->setParameter('categoryId', $categoryId);
         }
@@ -384,13 +405,34 @@ public function countAll(
         ->leftJoin('a.assignments', 'ass')
         ->leftJoin('ass.user', 'u')
         ->leftJoin('a.createdBy', 'creator')
+        ->leftJoin('a.etatBiens', 'e')  // ✅ JOIN pour l'état du bien
+        ->leftJoin('a.services', 's')   // ✅ JOIN pour le service
+        ->leftJoin('a.champs', 'champ')     // ✅ JOIN pour les champs personnalisés
+        ->leftJoin('champ.inputs', 'input') // ✅ JOIN pour les valeurs
         ->andWhere('a.isDelete = :isDelete')
         ->setParameter('isDelete', $isDelete);
 
-    // Recherche
+    // 🔍 RECHERCHE AMÉLIORÉE : cherche dans plusieurs champs
     if (null !== $search && '' !== $search) {
-        $qb->andWhere('a.nom LIKE :search OR a.reference LIKE :search OR a.numeroSerie LIKE :search')
-            ->setParameter('search', '%' . $search . '%');
+        $searchTerm = '%' . $search . '%';
+        $qb->leftJoin('a.categories', 'c')
+           ->leftJoin('a.assetTypes', 't')
+           ->andWhere(
+               $qb->expr()->orX(
+                   'a.nom LIKE :search',
+                   'a.reference LIKE :search',
+                   'a.numeroSerie LIKE :search',
+                   'a.description LIKE :search',
+                   'a.code LIKE :search',
+                   'c.nom LIKE :search',
+                   't.nom LIKE :search',
+                   'e.nom LIKE :search',        // ✅ État du bien
+                   's.nom LIKE :search',        // ✅ Structure (service)
+                   'champ.nom LIKE :search',    // ✅ NOM du champ personnalisé
+                   'input.valeur LIKE :search'  // ✅ VALEUR du champ personnalisé
+               )
+           )
+           ->setParameter('search', $searchTerm);
     }
 
     // ✅ AJOUTER LES JOIN UNIQUEMENT SI NÉCESSAIRE

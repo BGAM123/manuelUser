@@ -1,0 +1,16 @@
+{% extends 'layouts/base_swagger-ui.html.twig' %}
+
+{% block title %}
+	Core API Documentation
+{% endblock %}
+
+{% block body %}
+    <script>
+        window.onload = function() {
+            SwaggerUIBundle({
+                url: "/swagger/Core.json",
+                dom_id: '#swagger-ui',
+            });
+        };
+    </script>
+{% endblock %}

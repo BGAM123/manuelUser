@@ -888,7 +888,7 @@ final class AssetResponseBuilder
         foreach ($asset->getReevaluations() as $reevaluation) {
             $result[] = [
                 'id' => $reevaluation->getId(),
-                // 'valeurActuelle' => $this->normalizeValeur($reevaluation->getValeurActuelle()),
+                'valeurActuelle' => $this->normalizeValeur($reevaluation->getValeurActuelle()),
                 'nouvelleValeur' => $this->normalizeValeur($reevaluation->getNouvelleValeur()),
                 'methodeEvaluation' => $reevaluation->getMethodeEvaluation(),
                 'service' => $reevaluation->getService() ? [

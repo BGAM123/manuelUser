@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accusé de réception - MINEPIA</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: #ffffff;
+            color: #1e3a8a;
+            padding: 30px 20px;
+            text-align: center;
+            border-bottom: 3px solid #3b82f6;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .header-left {
+            text-align: left;
+            flex: 1;
+            font-size: 11px;
+            line-height: 1.5;
+            font-weight: 500;
+            text-transform: uppercase;
+            color: #000000;
+        }
+        .header-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 20px;
+        }
+        .header-center img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+        }
+        .header-right {
+            text-align: right;
+            flex: 1;
+            font-size: 11px;
+            line-height: 1.5;
+            font-weight: 500;
+            text-transform: uppercase;
+            color: #000000;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e3a8a;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            color: #374151;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 16px;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        .info-box {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+        .info-box h2 {
+            color: #1e3a8a;
+            font-size: 18px;
+            margin: 0 0 15px 0;
+            text-align: center;
+        }
+        .info-item {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #dbeafe;
+        }
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #1e3a8a;
+            min-width: 150px;
+        }
+        .info-value {
+            color: #374151;
+            flex: 1;
+        }
+        .message {
+            font-size: 15px;
+            color: #4b5563;
+            line-height: 1.6;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .link-box {
+            background-color: #f0f9ff;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .link-box p {
+            margin: 0 0 10px 0;
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+        .link-box a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .link-box a:hover {
+            text-decoration: underline;
+        }
+        .footer {
+            background-color: #f8fafc;
+            padding: 25px 30px;
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer strong {
+            color: #1e3a8a;
+            display: block;
+            margin-top: 10px;
+        }
+        @media only screen and (max-width: 600px) {
+            .header-top {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .header-left,
+            .header-right {
+                text-align: center;
+            }
+            .header-center {
+                order: -1;
+                padding: 10px 0;
+            }
+            .info-item {
+                flex-direction: column;
+            }
+            .info-label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div class="header-left">
+                    REPUBLIC OF CAMEROON<br>
+                    Peace - Work - Fatherland<br>
+                    MINISTRY OF LIVESTOCK<br>
+                    FISHERIES AND ANIMAL INDUSTRIES
+                </div>
+                <div class="header-center">
+                    <img src="https://cdeno.org/wp-content/uploads/2023/11/LOGO-MINEPIA-1024x1024.jpg" alt="Logo MINEPIA">
+                </div>
+                <div class="header-right">
+                    RÉPUBLIQUE DU CAMEROUN<br>
+                    Paix - Travail - Patrie<br>
+                    MINISTÈRE DE L'ÉLEVAGE,<br>
+                    DES PÊCHES ET INDUSTRIES ANIMALES
+                </div>
+            </div>
+            <h1>✅ Accusé de Réception</h1>
+            <p>Ministère de l'Élevage, des Pêches et des Industries Animales</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Bonjour <strong>{{ courrier.civilite }} {{ courrier.nom }}</strong>,
+            </div>
+            
+            <p class="message">
+                Nous accusons réception de votre courrier. Celui-ci a été enregistré avec succès dans notre système 
+                et transmis au service compétent pour traitement.
+            </p>
+            
+            <div class="info-box">
+                <h2>📄 Détails de votre courrier</h2>
+                <div class="info-item">
+                    <span class="info-label">Numéro :</span>
+                    <span class="info-value">{{ courrier.numero }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Référence :</span>
+                    <span class="info-value">{{ courrier.reference }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Objet :</span>
+                    <span class="info-value">{{ courrier.objet }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Date d'enregistrement :</span>
+                    <span class="info-value">{{ courrier.dateEnregistrement ? courrier.dateEnregistrement|date('d/m/Y') : 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Service traitant :</span>
+                    <span class="info-value">{{ courrier.idServiceTraitant ? courrier.idServiceTraitant.nom : 'N/A' }}</span>
+                </div>
+            </div>
+            
+            <p class="message">
+                Votre courrier sera traité dans les meilleurs délais. Vous pouvez suivre son traitement en ligne.
+            </p>
+            
+            <div class="link-box">
+                <p>🔗 Consultez vos dossiers en ligne :</p>
+                <a href="https://minepia.cm/site/consultez-vos-dossiers/" target="_blank">
+                    https://minepia.cm/site/consultez-vos-dossiers/
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Cordialement,
+            <strong>MINEPIA - Ministère de l'Élevage, des Pêches et des Industries Animales</strong>
+        </div>
+    </div>
+</body>
+</html>

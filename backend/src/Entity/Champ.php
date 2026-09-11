@@ -72,8 +72,7 @@ class Champ
      * ✅ Nouveau champ : Type du champ
      * Exemples: text, number, select, checkbox, radio, date, etc.
      */
-    #[ORM\Column(length: 50, nullable: false)]
-    #[Assert\NotBlank(message: 'Le type du champ est obligatoire.')]
+    #[ORM\Column(length: 50, nullable: true)]
     #[Assert\Length(
         max: 50,
         maxMessage: 'Le type du champ ne peut pas dépasser {{ limit }} caractères.'

@@ -1,0 +1,41 @@
+<script>
+    const notyf = new Notyf({
+        dismissible: true, // Fermer la notification manuellement (Permettre: true, Désactive: false)
+        duration: 3000, // Durée d'affichage en ms (0 pour une durée infinie)
+        ripple: true, // Effet d'onde visuelle (ripple) lors de l'apparition de la notification (Active: true, Désactive: false)
+        position: {
+            x: 'right', // Position horizontale de la notification (left, center, right)
+            y: 'top', // Position verticale de la notification (top, bottom)
+        },
+        types: [
+            {
+                type: 'info', // Type de notification
+                background: '#00bfff', // Couleur de fond de la notification
+                icon: false
+            },
+            {
+                type: 'warning', // Type de notification
+                background: '#ffd700', // Couleur de fond de la notification
+                icon: {
+                    className: 'notyf__icon--error', // Classe CSS pour l'icône
+                    tagName: 'i', // Balise HTML utilisée pour l'icône (ici une balise <i>)
+                    color: '#ffd700' // Couleur de l'icône (ici le même que la notification)
+                }
+            }
+        ]
+    });
+
+    {% for type, messages in app.flashes(['success', 'error', 'info', 'warning']) %}
+        {% for message in messages %}
+            {% if type == 'success' %}
+                notyf.success("{{ message }}"); // Utilisation de notyf.success pour les succès
+            {% elseif type == 'error' %}
+                notyf.error("{{ message }}"); // Utilisation de notyf.error pour les erreurs
+            {% elseif type == 'info' %}
+                notyf.open({type: 'info', message: "{{ message }}"}); // Utilisation de notyf.open pour les infos
+            {% elseif type == 'warning' %}
+                notyf.open({type: 'warning', message: "{{ message }}"}); // Utilisation de notyf.open pour les avertissements
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+</script>
